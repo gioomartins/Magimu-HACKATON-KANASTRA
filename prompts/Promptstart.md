@@ -9,12 +9,14 @@ O lema do produto é: "Importar. Decidir. Explicar. Simular."
 
 ### DIRETRIZES DE ARQUITETURA BACKEND (DJANGO)
 
-1. MODELAGEM DE DADOS E IDEMPOTÊNCIA (ORM)
-Crie um model `Recebivel` mapeando exatamente as colunas do CSV de entrada: nome_fundo, doc_fundo, nome_cedente, doc_cedente, nome_sacado, doc_sacado, nu_documento, tipo_recebivel, valor_nominal (Decimal), data_vencimento_original (Date) e data_aquisicao (Date).
-- Adicione os campos de controle interno: valor_liquido (Decimal), status (CharField: Aprovada/Recusada), motivo_recusa (TextField) e hash_id (CharField com indexação).
-- Regra de Idempotência: O `hash_id` deve ser gerado usando SHA-256 combinando os campos `doc_cedente + doc_sacado + nu_documento`. 
-- Mock de API: Para a regra "SITUACAO_CADASTRAL_SACADO", crie uma função mockada que simule uma consulta de CNPJ retornando sempre o status "ATIVA".
-- Prevenção de Race Condition: Adicione uma `UniqueConstraint` no banco de dados para o `hash_id`. No parser do CSV, trate as datas no padrão BR (dd/mm/yyyy) e use `bulk_create(ignore_conflicts=True)` para garantir que envios simultâneos falhem silenciosamente a nível de banco sem quebrar a aplicação, classificando a nota como "Recusada: Duplicidade".
+1. MODELAGEM DE DADOS E REGRA DE DUPLICIDADE (BUSINESS LOGIC)
+Crie um model `Recebivel` mapeando as colunas do CSV: nome_fundo, doc_fundo, nome_cedente, doc_cedente, nome_sacado, doc_sacado, nu_documento, tipo_recebivel, valor_nominal (Decimal), data_vencimento_original (Date) e data_aquisicao (Date).
+- Adicione campos de controle: valor_liquido (Decimal), status (CharField: Aprovada/Recusada), motivo_recusa (TextField), e hash_id (CharField com indexação, mas SEM UniqueConstraint global).
+- Geração do Hash: O `hash_id` deve ser gerado usando SHA-256 combinando `doc_cedente + doc_sacado + nu_documento`.
+- Validador de Duplicidade (Crucial): A duplicidade não deve ser bloqueada no nível do DB (para que possamos salvar e exibir a recusa no Front). Crie um `ValidadorDuplicidade` no Strategy Pattern que barra a nota se:
+  a) O `hash_id` já existir no banco de dados com status "Aprovada" (faça cache dos hashes aprovados antes de iniciar o loop).
+  b) O `hash_id` já tiver aparecido no mesmo CSV (use um Python `set()` em memória durante a leitura do chunk para checar concorrência intralote).
+- Se a duplicidade for detectada, grave o status como "Recusada" e o motivo como "Nota já antecipada ou em duplicidade no lote atual".
 
 2. OTIMIZAÇÃO DE UPLOAD E CHUNKING
 O sistema deve suportar CSVs de até 500.000 linhas. 
