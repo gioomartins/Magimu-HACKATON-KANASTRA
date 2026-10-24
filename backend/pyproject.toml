@@ -1,0 +1,19 @@
+[project]
+name = "antecipe-backend"
+version = "0.1.0"
+description = "Antecipe - backoffice de antecipação de recebíveis (Hackathon Kanastra 2026)"
+authors = [
+    { name = "ThwyIgo", email = "thiagopachecorocha@hotmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.1.2",
+    "django-cors-headers>=4.9.0",
+    "djangorestframework>=3.18.3",
+    "psycopg[binary]>=3.3.6",
+    "python-dotenv>=1.2.4",
+]
+
+[tool.uv]
+# Aplicação Django (não é um pacote distribuível): sem build-system.
+package = false

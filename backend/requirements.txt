@@ -1,0 +1,27 @@
+asgiref==3.13.0
+    # via
+    #   django
+    #   django-cors-headers
+django==6.1.2
+    # via
+    #   antecipe-backend
+    #   django-cors-headers
+    #   djangorestframework
+django-cors-headers==4.9.0
+    # via antecipe-backend
+djangorestframework==3.18.3
+    # via antecipe-backend
+psycopg==3.3.6
+    # via antecipe-backend
+psycopg-binary==3.3.6 ; implementation_name != 'pypy'
+    # via psycopg
+python-dotenv==1.2.4
+    # via antecipe-backend
+sqlparse==0.6.0
+    # via django
+typing-extensions==4.16.0 ; python_full_version < '3.13'
+    # via psycopg
+tzdata==2026.5 ; sys_platform == 'win32'
+    # via
+    #   django
+    #   psycopg

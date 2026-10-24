@@ -10,22 +10,38 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
+from datetime import date
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Raiz do repositório (onde ficam validadores_antecipe.json, CSVs e docker-compose.yml).
+REPO_ROOT = BASE_DIR.parent
+
+# O .env fica na raiz do repositório e é compartilhado com o docker compose.
+load_dotenv(REPO_ROOT / '.env')
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-0kswf=7txohiq&l=if9(vjrau4i%%&sym(ol(0*c@o0tu3jc-('
+SECRET_KEY = os.getenv(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-0kswf=7txohiq&l=if9(vjrau4i%%&sym(ol(0*c@o0tu3jc-(',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DJANGO_DEBUG', True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 
 
 # Application definition
@@ -37,9 +53,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
+    # Terceiros
+    'rest_framework',
+    'corsheaders',
+    # Apps do projeto
+    'core',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -48,6 +71,13 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
 
 ROOT_URLCONF = 'config.urls'
 
@@ -74,10 +104,18 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB', 'antecipe'),
+        'USER': os.getenv('POSTGRES_USER', 'antecipe'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'antecipe'),
+        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        # Reaproveita conexões entre requests (uploads grandes fazem muitas queries).
+        'CONN_MAX_AGE': int(os.getenv('POSTGRES_CONN_MAX_AGE', '60')),
     }
 }
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Password validation
@@ -102,9 +140,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 
@@ -125,3 +163,24 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Antecipe - configurações de domínio
+# ---------------------------------------------------------------------------
+
+# Arquivo de regras (fonte da verdade). Pode ser sobrescrito sem deploy.
+ANTECIPE_VALIDADORES_PATH = Path(
+    os.getenv('ANTECIPE_VALIDADORES_PATH', REPO_ROOT / 'validadores_antecipe.json')
+)
+
+# Base de situação cadastral dos CNPJs (mock da Receita Federal).
+ANTECIPE_SITUACAO_CNPJ_PATH = Path(
+    os.getenv('ANTECIPE_SITUACAO_CNPJ_PATH', REPO_ROOT / 'cnpj_situacao_mock.csv')
+)
+
+# Data-base fixa para cálculos financeiros (formato ISO: AAAA-MM-DD).
+ANTECIPE_DATA_BASE = date.fromisoformat(os.getenv('ANTECIPE_DATA_BASE', '2026-10-22'))
+
+# Tamanho dos lotes de leitura/escrita no banco durante a importação.
+ANTECIPE_CHUNK_SIZE = int(os.getenv('ANTECIPE_CHUNK_SIZE', '10000'))
