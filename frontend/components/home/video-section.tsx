@@ -89,35 +89,35 @@ export function VideoSection() {
           <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-[#0b2c20] flex items-center justify-center">
             <video
               ref={videoRef}
-              src="/animacao-logo-antecipe.mp4"
+              src="/apresentacaoprojeto-nova-logo.mp4"
               poster="/animacao-logo-antecipe-poster.jpg"
               preload="metadata"
-              muted
+              controls
               playsInline
-              aria-label="Animação visual da marca e logotipo Antecipe FIDC"
+              aria-label="Vídeo de Apresentação do Projeto Antecipe"
               onEnded={() => setIsPlaying(false)}
               className="h-full w-full object-contain"
             />
 
             {/* Botão Flutuante de Reproduzir Novamente */}
-            <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleReplay}
-                aria-label="Reproduzir novamente a animação da marca"
+                aria-label="Reiniciar o vídeo de apresentação"
                 className="flex items-center gap-1.5 rounded-lg bg-emerald-950/80 px-3 py-2 text-xs font-semibold text-emerald-200 backdrop-blur-md transition hover:bg-emerald-900 hover:text-white border border-emerald-400/20 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
                 <RotateCcw size={13} />
-                <span>{isPlaying ? 'Reiniciar' : 'Reproduzir novamente'}</span>
+                <span>{isPlaying ? 'Reiniciar' : 'Reproduzir'}</span>
               </button>
             </div>
           </div>
 
           {/* Legenda Acessível */}
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-emerald-100/60 border-t border-emerald-900/40 pt-3">
-            <span>Animação oficial da identidade Antecipe · 4,5 segundos</span>
+            <span>Apresentação Oficial do Projeto Antecipe · Pitch & Demonstração</span>
             <span className="text-[11px] text-emerald-300/80 mt-1 sm:mt-0">
-              {prefersReducedMotion ? 'Movimento reduzido ativado no sistema' : 'Execução sob demanda'}
+              Vídeo em alta definição com controles integrados
             </span>
           </div>
         </div>

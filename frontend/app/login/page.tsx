@@ -125,7 +125,38 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 border-t border-stone-200 pt-6 text-center text-xs text-stone-600">
+        {/* Acesso Rápido para Avaliação / Testes */}
+        <div className="mt-6 rounded-xl border border-emerald-900/10 bg-emerald-50/70 p-3.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
+            Credenciais Padrão de Teste (1-Clique)
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('cedente_demo')
+                setPassword('password123')
+              }}
+              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
+            >
+              <span className="block font-bold">Cedente (Empresa)</span>
+              <span className="text-[10px] text-stone-500">cedente_demo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('gestor_demo')
+                setPassword('password123')
+              }}
+              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
+            >
+              <span className="block font-bold">Fundo (Gestor)</span>
+              <span className="text-[10px] text-stone-500">gestor_demo</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 border-t border-stone-200 pt-5 text-center text-xs text-stone-600">
           Ainda não tem conta?{' '}
           <Link
             href="/register"
