@@ -68,15 +68,22 @@ export default function AnalyticsGestorPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
-  // Proteção de Rota: Redireciona para /plataforma se não for GESTOR
+  // Proteção de Rota: Redireciona para /login se não for GESTOR e não estiver saindo
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !isLoggingOut) {
       if (!user || user.role !== 'GESTOR') {
-        router.push('/plataforma')
+        router.push('/login')
       }
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, isLoggingOut, router])
+
+  const handleLogout = () => {
+    setIsLoggingOut(true)
+    logout()
+    router.push('/')
+  }
 
   const carregarDados = async () => {
     setLoading(true)
@@ -198,7 +205,7 @@ export default function AnalyticsGestorPage() {
               </span>
               <button
                 type="button"
-                onClick={logout}
+                onClick={handleLogout}
                 className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300 hover:text-white transition"
                 title="Sair da conta"
               >

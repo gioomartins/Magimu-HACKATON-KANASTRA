@@ -1,20 +1,47 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BarChart3, Building2, LogOut, User, Wallet } from 'lucide-react'
+import { ArrowLeft, BarChart3, Building2, LogOut, RefreshCw, User, Wallet } from 'lucide-react'
 import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
 import { ThemeToggle } from './theme-toggle'
 import { useAuth } from '@/lib/auth-context'
 
 export function AntecipeDashboard() {
-  const { user, logout } = useAuth()
+  const router = useRouter()
+  const { user, isLoading, logout } = useAuth()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Se o usuário não estiver autenticado e não estiver em processo de logout, redireciona para login
+  useEffect(() => {
+    if (!isLoading && !user && !isLoggingOut) {
+      router.push('/login')
+    }
+  }, [user, isLoading, isLoggingOut, router])
+
+  const handleLogout = () => {
+    setIsLoggingOut(true)
+    logout()
+    router.push('/')
+  }
+
+  if (isLoading || !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f6f1] text-[#0b2c20] dark:bg-[#0b2c20] dark:text-[#f8f6f1]">
+        <div className="flex items-center gap-3 text-sm">
+          <RefreshCw className="animate-spin text-emerald-500" size={18} />
+          <span>{isLoggingOut ? 'Saindo da conta...' : 'Verificando autenticação...'}</span>
+        </div>
+      </main>
+    )
+  }
 
   // Separação estrita de facetas:
   // - Usuário GESTOR acessa exclusivamente a Área dos Fundos.
-  // - Usuário EMPRESA (ou anônimo) acessa exclusivamente a Área dos Cedentes.
-  // Não há botão de troca entre facetas: para alternar, deve-se sair e entrar com a outra conta.
-  const isGestor = user?.role === 'GESTOR'
+  // - Usuário EMPRESA acessa exclusivamente a Área dos Cedentes.
+  const isGestor = user.role === 'GESTOR'
 
   return (
     <main id="conteudo-principal" className="min-h-screen bg-[#f8f6f1] text-stone-900 transition-colors duration-200 dark:bg-[#0b2c20] dark:text-stone-100">
@@ -86,9 +113,9 @@ export function AntecipeDashboard() {
                 </span>
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="ml-1 inline-flex items-center gap-1 text-[11px] font-semibold text-stone-500 hover:text-rose-600 dark:text-emerald-200/60 dark:hover:text-rose-300 transition"
-                  title="Sair da conta (necessário para trocar de faceta)"
+                  title="Sair da conta"
                 >
                   <LogOut size={12} />
                   <span>Sair</span>

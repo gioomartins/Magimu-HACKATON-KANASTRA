@@ -2,8 +2,11 @@
 
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 
 export function CtaSection() {
+  const { user } = useAuth()
+
   return (
     <section aria-labelledby="cta-heading" className="py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -36,7 +39,7 @@ export function CtaSection() {
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/plataforma"
+                href={user ? "/plataforma" : "/login"}
                 className="inline-flex h-12 min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#f8f6f1] px-8 text-xs font-bold uppercase tracking-wider text-[#0b2c20] shadow-lg transition hover:bg-white hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
               >
                 <span>Abrir plataforma</span>

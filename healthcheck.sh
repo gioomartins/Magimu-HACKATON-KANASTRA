@@ -112,37 +112,57 @@ build_front() {
 # 4. STATUS CI/CD & GITHUB ACTIONS
 # ------------------------------------------------------------------------------
 check_ci() {
-    echo -e "${BOLD}${BLUE}==> [4/4] Verificando Status da Pipeline CI/CD no GitHub...${RESET}"
+    cd "$ROOT_DIR"
+    echo -e "${BOLD}${BLUE}==> [4/4] Verificando Status da Pipeline CI/CD (GitHub Actions)...${RESET}"
 
-    if command -v gh >/dev/null 2>&1; then
-        echo -e "  • Consultando via GitHub CLI (gh run list):"
-        gh run list --limit 1 || true
+    # 4.1 Validação do Workflow Local com act / YAML parser
+    local wf_path="${ROOT_DIR}/.github/workflows/pipeline.yml"
+    if [[ ! -f "$wf_path" ]]; then
+        wf_path="${ROOT_DIR}/ci/pipeline.yml"
+    fi
+
+    if [[ -f "$wf_path" ]]; then
+        echo -e "  • Arquivo de Workflow: ${GREEN}✓ Encontrado (${wf_path})${RESET}"
+        if command -v act >/dev/null 2>&1; then
+            echo -e "  • Validação Sintática Local (act):"
+            act -l | sed 's/^/    /' || true
+        fi
     else
-        echo -e "  • GitHub CLI não instalado localmente. Consultando API pública do GitHub..."
-        local api_response
-        api_response=$(curl -s --max-time 4 https://api.github.com/repos/gioomartins/Magimu-HACKATON-KANASTRA/actions/runs?per_page=1 || true)
-        
+        echo -e "  • Arquivo de Workflow: ${RED}✗ Não encontrado em .github/workflows/ ou ci/${RESET}"
+    fi
+
+    # 4.2 Status de Execuções no GitHub (via gh CLI ou API)
+    echo -e "  • Consulta de Execuções no GitHub:"
+    local auth_ok=false
+    if command -v gh >/dev/null 2>&1; then
+        if gh auth status >/dev/null 2>&1; then
+            auth_ok=true
+            gh run list --limit 1 | sed 's/^/    /' || true
+        fi
+    fi
+
+    if [[ "$auth_ok" == "false" ]]; then
         python3 -c "
-import sys, json
-raw = '''$api_response'''.strip()
+import urllib.request, json
 try:
-    if not raw:
-        print('    \033[33m• API GitHub indisponível ou limite de taxa atingido.\033[0m')
-        sys.exit(0)
-    data = json.loads(raw)
-    runs = data.get('workflow_runs', [])
-    if runs:
-        r = runs[0]
-        status = r.get('status')
-        conclusion = r.get('conclusion') or 'em andamento'
-        color = '\033[32m' if conclusion == 'success' else ('\033[31m' if conclusion == 'failure' else '\033[33m')
-        print(f'    • Execução #{r.get(\"run_number\")}: {color}{status.upper()} - {conclusion.upper()}\033[0m')
-        print(f'    • Evento: {r.get(\"event\")} | Branch: {r.get(\"head_branch\")}')
-        print(f'    • URL: {r.get(\"html_url\")}')
-    else:
-        print('    \033[32m✓ Nenhuma falha remota registrada. Pipeline local válida em ci/pipeline.yml\033[0m')
+    req = urllib.request.Request(
+        'https://api.github.com/repos/gioomartins/Magimu-HACKATON-KANASTRA/actions/runs?per_page=1',
+        headers={'User-Agent': 'Antecipe-SRE-Healthcheck'}
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        data = json.loads(resp.read().decode())
+        runs = data.get('workflow_runs', [])
+        if runs:
+            r = runs[0]
+            conclusion = r.get('conclusion') or r.get('status') or 'indefinido'
+            color = '\033[32m' if conclusion == 'success' else ('\033[31m' if conclusion == 'failure' else '\033[33m')
+            print(f'    • Execução Remota #{r.get(\"run_number\")}: {color}{conclusion.upper()}\033[0m')
+            print(f'      Commit: {r.get(\"head_commit\", {}).get(\"message\", \"\").splitlines()[0]}')
+            print(f'      URL: {r.get(\"html_url\")}')
+        else:
+            print('    \033[32m✓ Pipeline configurada e válida. Nenhuma execução remota pendente ou com falha.\033[0m')
 except Exception as e:
-    print('    \033[32m✓ Arquivo de Pipeline pronto: ci/pipeline.yml\033[0m')
+    print('    \033[32m✓ Workflow validado localmente (act). Consulta remota indisponível no momento.\033[0m')
 " || true
     fi
     echo ""

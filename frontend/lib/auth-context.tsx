@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // localStorage indisponível
     }
-    if (typeof window !== 'undefined' && window.location.pathname !== '/plataforma') {
-      window.location.href = '/plataforma'
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.location.href = '/'
     }
   }
 

@@ -126,7 +126,7 @@ export function Navbar() {
           )}
 
           <Link
-            href="/plataforma"
+            href={user ? "/plataforma" : "/login"}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b2c20] px-5 text-xs font-bold uppercase tracking-wider text-[#f8f6f1] shadow-sm transition-all hover:bg-[#103b2c] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 dark:bg-[#f8f6f1] dark:text-[#0b2c20] dark:hover:bg-white"
           >
             <span>Abrir plataforma</span>
@@ -192,7 +192,7 @@ export function Navbar() {
 
           <div className="mt-8 pt-4">
             <Link
-              href="/plataforma"
+              href={user ? "/plataforma" : "/login"}
               onClick={fecharMenu}
               className="flex h-12 min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#0b2c20] text-xs font-bold uppercase tracking-wider text-[#f8f6f1] shadow-md dark:bg-emerald-400 dark:text-[#0b2c20]"
             >
