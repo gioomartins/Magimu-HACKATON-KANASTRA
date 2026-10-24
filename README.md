@@ -6,6 +6,15 @@
 
 ---
 
+Hospedado em [https://magimu-hackaton-kanastra.vercel.app/](https://magimu-hackaton-kanastra.vercel.app/)
+
+####Tecnologias:
+- Backend: Django (Python 3.12, Django REST Framework, SimpleJWT, PostgreSQL) hospedado no Render.
+- Frontend: Next.js + Tailwind CSS hospedado na Vercel.
+
+NÃO ESTÁ FUNCIONANDO 100% ;-;
+Para testar funcionalidades funcionando bem, teste localmente
+
 ## 🚀 Guia Rápido de Execução e Fluxo do Sistema
 
 ### 1. Como instalar todas as dependências necessárias
@@ -503,6 +512,7 @@ Durante o desenvolvimento, a base de teste oficial (`estoque_antecipe.csv`) com 
    Consumir a API nacional da Receita Federal e SEFAZ para verificar o manifesto do destinatário, atestando se a mercadoria ou serviço da nota fiscal foi efetivamente entregue antes da cessão do crédito.
 3. **Score de Crédito Inteligente com Machine Learning:**  
    Treinar modelos preditivos de *default* a partir do histórico de pontualidade de pagamento dos sacados, calculando uma taxa de desconto personalizada e orientada ao risco de cada devedor.
+4. **Adicionar Botão para Traduzir Língua da Plataforma**
 
 ---
 *Magimu Antecipe — Segurança institucional para o fundo, liquidez e transparência para a empresa.*

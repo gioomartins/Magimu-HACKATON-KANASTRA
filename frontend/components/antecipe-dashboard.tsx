@@ -8,7 +8,6 @@ import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
 import { UploadLoteCsv } from './upload-lote-csv'
 import { ThemeToggle } from './theme-toggle'
-import { LanguageSwitcher } from './language-switcher'
 import { useAuth } from '@/lib/auth-context'
 import { useTranslation } from 'react-i18next'
 import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
@@ -166,9 +165,6 @@ export function AntecipeDashboard() {
                 <span>{t('common.login')}</span>
               </Link>
             )}
-
-            {/* Alternador de Idioma (PT / EN) */}
-            <LanguageSwitcher />
 
             {/* Alternador de Tema Claro / Escuro */}
             <ThemeToggle />
