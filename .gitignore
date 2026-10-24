@@ -20,3 +20,10 @@ staticfiles/
 .idea/
 .vscode/
 *.swp
+
+# Testes & Cobertura
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+

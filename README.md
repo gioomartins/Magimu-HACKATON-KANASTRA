@@ -15,8 +15,9 @@
 - [5. Diagramas de Fluxo e Arquitetura (Mermaid)](#5-diagramas-de-fluxo-e-arquitetura-mermaid)
 - [6. CI/CD & Segurança (RBAC + JWT)](#6-cicd--segurança-rbac--jwt)
 - [7. Guia de Execução Local (Passo a Passo)](#7-guia-de-execução-local-passo-a-passo)
-- [8. Métricas e Auditoria da Base de Dados](#8-métricas-e-auditoria-da-base-de-dados)
-- [9. Trabalhos Futuros](#9-trabalhos-futuros)
+- [8. Verificação Completa e Healthchecks (DevOps / SRE)](#8-verificação-completa-e-healthchecks-devops--sre)
+- [9. Métricas e Auditoria da Base de Dados](#9-métricas-e-auditoria-da-base-de-dados)
+- [10. Trabalhos Futuros](#10-trabalhos-futuros)
 
 ---
 
@@ -41,7 +42,7 @@ Para facilitar a auditoria e a avaliação da banca avaliadora, o sistema já di
 | Perfil / Papel | Usuário | Senha | Escopo de Acesso na Plataforma |
 | :--- | :--- | :--- | :--- |
 | **Cedente (Empresa)** | `cedente_demo` | `password123` | **Faceta do Cedente:** Upload de arquivos CSV, listagem paginada (20/20), toggle de detalhamento com explicação de recusas, simulação financeira em tempo real. Bloqueado de alterar regras do fundo (`403 Forbidden`). |
-| **Fundo (Gestor)** | `gestor_demo` | `password123` | **Acesso Completo:** Todas as funções da empresa + **Faceta dos Fundos:** Parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
+| **Fundo (Gestor)** | `gestor_demo` | `password123` | **Acesso Completo:** Todas as funções da empresa + **Área dos Fundos:** Parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
 
 > *Nota:* Usuários alternativos adicionais disponíveis: `empresa_demo` (Empresa) e `fundo_demo` (Gestor), ambos com a senha `password123`.
 
@@ -226,7 +227,7 @@ A plataforma implementa controle de acesso rigoroso por meio de permissões cust
 │ POST /api/upload-csv/     │ Permitido     │ Permitido                     │
 │ GET  /api/regras/         │ 403 Forbidden │ Permitido (Consulta regras)   │
 │ POST /api/regras/         │ 403 Forbidden │ Permitido (Edição de regras)  │
-│ Botão Faceta dos Fundos   │ Desabilitado  │ Habilitado e navegável        │
+│ Botão Área dos Fundos   │ Desabilitado  │ Habilitado e navegável        │
 └───────────────────────────┴───────────────┴───────────────────────────────┘
 ```
 
@@ -289,7 +290,72 @@ Acesse a aplicação no navegador em: **[http://localhost:3000](http://localhost
 
 ---
 
-## 8. Métricas e Auditoria da Base de Dados
+## 8. Verificação Completa e Healthchecks (DevOps / SRE)
+
+Para auditar e certificar a saúde, a performance e a integridade de ponta a ponta do **Antecipe** nos momentos de avaliação e homologação, disponibilizamos um utilitário automatizado de terminal via [`healthcheck.sh`](./healthcheck.sh) e [`Makefile`](./Makefile).
+
+### 8.1. Auditoria Global Completa (Comando Único)
+
+Com os serviços iniciados, execute a auditoria global completa a partir da raiz do projeto:
+
+```bash
+# Via script bash nativo:
+./healthcheck.sh all
+
+# Ou via Makefile:
+make audit-all
+```
+
+Este comando orquestra sequencialmente 4 baterias de validação automática:
+1. **[1/4] Portas e Inicialização de Serviços:** Realiza pings HTTP no Backend Django (`http://localhost:8000/api/recebiveis/`) e no Frontend Next.js (`http://localhost:3000/`), além de consultar o PostgreSQL via `showmigrations` para certificar que **100% das migrações estão aplicadas**.
+2. **[2/4] Suíte de Testes com Saída Visual e Cobertura:** Dispara o `pytest -v --color=yes --cov=core` exibindo o status individual de cada teste unitário e o relatório de cobertura de código das regras de negócio.
+3. **[3/4] Build de Produção do Frontend:** Executa `next build` no Next.js para garantir que não há erros de tipagem TypeScript ou de sintaxe quebrando o deploy.
+4. **[4/4] Verificação CI/CD:** Checa o status da pipeline no GitHub Actions (via GitHub CLI `gh` ou fallback para a API pública do GitHub).
+5. **[Diagnóstico SRE] Logs Recentes de Performance:** Lê o arquivo `backend/logs/performance_profile.log` e exibe o tempo total gasto na ingestão de CSV, tempo de CPU, queries executadas e operações de `bulk_create`.
+
+---
+
+### 8.2. Comandos de Verificação Segmentada
+
+Caso deseje auditar apenas uma etapa específica do sistema:
+
+```bash
+# 1. Verifica apenas a saúde das portas (8000, 3000) e migrações do banco
+./healthcheck.sh ports        # ou: make check-ports
+
+# 2. Roda apenas a suíte de testes com cores e cobertura (Pytest)
+./healthcheck.sh tests        # ou: make test-visual
+
+# 3. Valida apenas a compilação e tipagem estática do Frontend
+./healthcheck.sh build        # ou: make build-front
+
+# 4. Consulta apenas o status da pipeline de CI/CD
+./healthcheck.sh ci           # ou: make check-ci
+
+# 5. Exibe os últimos logs de profiling de performance da ingestão
+./healthcheck.sh perf         # ou: make perf-logs
+```
+
+---
+
+### 8.3. Profiling de Performance e Queries (`utils/profiler.py`)
+
+A função de processamento de CSV possui o decorador `@profile_performance` injetado, que intercepta cada query via `connection.execute_wrapper` e calcula o throughput de ingestão:
+
+```text
+┌───────────────────────── PERFORMANCE PROFILE ─────────────────────────┐
+│ Operação: Ingestão CSV & Validação em Lote                           │
+│ Tempo Total: 4.8210s (CPU: 3.9100s | BD: 0.9110s)                    │
+│ Queries Executadas: 24 queries (20 operações de bulk_create)         │
+│ Throughput Ingestão: 20.850 linhas/s                                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Todos os eventos de profiling ficam registrados em formato estruturado (JSON Lines) em `backend/logs/performance_profile.log` para fins de auditoria SRE.
+
+---
+
+## 9. Métricas e Auditoria da Base de Dados
 
 Durante o desenvolvimento, a base de teste oficial (`estoque_antecipe.csv`) com **100.554 títulos** foi submetida a auditoria computacional completa:
 
@@ -307,7 +373,7 @@ Durante o desenvolvimento, a base de teste oficial (`estoque_antecipe.csv`) com 
 
 ---
 
-## 9. Trabalhos Futuros
+## 10. Trabalhos Futuros
 
 1. **Mensageria Assíncrona e Arquitetura Orientada a Eventos:**  
    Substituir a ingestão HTTP direta por uma fila de eventos distribuída baseada em **NATS** ou **Apache Kafka**, associada a workers Celery, viabilizando o upload de arquivos de milhões de linhas com atualização de progresso em tempo real via WebSockets/SSE.
@@ -318,3 +384,4 @@ Durante o desenvolvimento, a base de teste oficial (`estoque_antecipe.csv`) com 
 
 ---
 *Magimu Antecipe — Segurança institucional para o fundo, liquidez e transparência para a empresa.*
+

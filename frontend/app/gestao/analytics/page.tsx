@@ -112,31 +112,31 @@ export default function AnalyticsGestorPage() {
   const motivosPieData =
     data?.motivos_recusa && data.motivos_recusa.length > 0
       ? data.motivos_recusa.map((m) => ({
-          name: m.motivo.replace(/_/g, ' '),
-          value: m.total,
-        }))
+        name: m.motivo.replace(/_/g, ' '),
+        value: m.total,
+      }))
       : [
-          { name: 'PRAZO MAXIMO', value: 12 },
-          { name: 'SITUACAO CADASTRAL', value: 8 },
-          { name: 'CONCENTRACAO SACADO', value: 5 },
-          { name: 'VALOR MINIMO', value: 3 },
-        ]
+        { name: 'PRAZO MAXIMO', value: 12 },
+        { name: 'SITUACAO CADASTRAL', value: 8 },
+        { name: 'CONCENTRACAO SACADO', value: 5 },
+        { name: 'VALOR MINIMO', value: 3 },
+      ]
 
   const sacadosBarData =
     data?.risco_concentracao && data.risco_concentracao.length > 0
       ? data.risco_concentracao.map((s) => ({
-          sacado: s.nome_sacado.length > 18 ? s.nome_sacado.slice(0, 18) + '...' : s.nome_sacado,
-          volume: s.volume,
-          exposicao: s.percentual_exposicao,
-          cnpj: formatCNPJ(s.doc_sacado),
-        }))
+        sacado: s.nome_sacado.length > 18 ? s.nome_sacado.slice(0, 18) + '...' : s.nome_sacado,
+        volume: s.volume,
+        exposicao: s.percentual_exposicao,
+        cnpj: formatCNPJ(s.doc_sacado),
+      }))
       : [
-          { sacado: 'DISTRIBUIDORA ALFA', volume: 1540000, exposicao: 28.5 },
-          { sacado: 'LOGISTICA BETA', volume: 920000, exposicao: 17.1 },
-          { sacado: 'SUPERMERCADOS GAMA', volume: 640000, exposicao: 11.8 },
-          { sacado: 'DELTA COMERCIO', volume: 430000, exposicao: 8.0 },
-          { sacado: 'EPSILON IND E COM', volume: 290000, exposicao: 5.4 },
-        ]
+        { sacado: 'DISTRIBUIDORA ALFA', volume: 1540000, exposicao: 28.5 },
+        { sacado: 'LOGISTICA BETA', volume: 920000, exposicao: 17.1 },
+        { sacado: 'SUPERMERCADOS GAMA', volume: 640000, exposicao: 11.8 },
+        { sacado: 'DELTA COMERCIO', volume: 430000, exposicao: 8.0 },
+        { sacado: 'EPSILON IND E COM', volume: 290000, exposicao: 5.4 },
+      ]
 
   const kpis = data?.kpis || {
     volume_total_aprovado: 0,
@@ -170,7 +170,7 @@ export default function AnalyticsGestorPage() {
                 title="Voltar para a parametrização de regras"
               >
                 <ArrowLeft size={13} />
-                <span>Faceta dos Fundos</span>
+                <span>Área dos Fundos</span>
               </Link>
             </div>
             <p className="mt-1 text-xs text-emerald-100/70">
@@ -438,11 +438,10 @@ export default function AnalyticsGestorPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <span
-                          className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                            s.exposicao > 20
+                          className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${s.exposicao > 20
                               ? 'bg-rose-100 text-rose-800'
                               : 'bg-emerald-100 text-emerald-800'
-                          }`}
+                            }`}
                         >
                           {s.exposicao}%
                         </span>

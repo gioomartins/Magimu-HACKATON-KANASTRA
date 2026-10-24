@@ -27,7 +27,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     pergunta: 'O gestor do fundo pode alterar as regras sem precisar de desenvolvimento?',
     resposta:
-      'Sim. Na Faceta dos Fundos da plataforma Antecipe, o gestor pode ativar ou desativar validadores, alterar prazos e percentuais de concentração e ajustar a taxa mensal diretamente na interface ou via importação de arquivo JSON de configuração.',
+      'Sim. Na Área dos Fundos da plataforma Antecipe, o gestor pode ativar ou desativar validadores, alterar prazos e percentuais de concentração e ajustar a taxa mensal diretamente na interface ou via importação de arquivo JSON de configuração.',
   },
   {
     pergunta: 'Quais tipos de recebíveis são aceitos na plataforma?',

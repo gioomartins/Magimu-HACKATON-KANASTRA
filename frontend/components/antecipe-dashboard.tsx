@@ -11,8 +11,8 @@ export function AntecipeDashboard() {
   const { user, logout } = useAuth()
 
   // Separação estrita de facetas:
-  // - Usuário GESTOR acessa exclusivamente a Faceta dos Fundos.
-  // - Usuário EMPRESA (ou anônimo) acessa exclusivamente a Faceta dos Cedentes.
+  // - Usuário GESTOR acessa exclusivamente a Área dos Fundos.
+  // - Usuário EMPRESA (ou anônimo) acessa exclusivamente a Área dos Cedentes.
   // Não há botão de troca entre facetas: para alternar, deve-se sair e entrar com a outra conta.
   const isGestor = user?.role === 'GESTOR'
 
@@ -51,7 +51,7 @@ export function AntecipeDashboard() {
               <div className="flex items-center gap-2">
                 <div className="inline-flex items-center gap-2 rounded-xl border border-amber-600/30 bg-amber-500/15 px-3.5 py-2 text-xs font-bold text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
                   <Building2 size={15} className="text-amber-600 dark:text-amber-400" />
-                  <span>Faceta dos Fundos</span>
+                  <span>Área dos Fundos</span>
                 </div>
 
                 {/* Aba / Atalho para Analytics & Risco */}
@@ -67,7 +67,7 @@ export function AntecipeDashboard() {
             ) : (
               <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-800/20 bg-emerald-900/10 px-3.5 py-2 text-xs font-bold text-emerald-900 dark:border-emerald-300/20 dark:bg-[#103b2c] dark:text-emerald-200">
                 <Wallet size={15} className="text-emerald-600 dark:text-emerald-400" />
-                <span>Faceta dos Cedentes</span>
+                <span>Área dos Cedentes</span>
               </div>
             )}
 
@@ -75,9 +75,8 @@ export function AntecipeDashboard() {
             {user ? (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-800/20 bg-white/80 px-3 py-2 text-xs shadow-sm dark:border-emerald-400/20 dark:bg-[#103b2c]">
                 <span
-                  className={`size-2 rounded-full ${
-                    isGestor ? 'bg-amber-400' : 'bg-emerald-400'
-                  }`}
+                  className={`size-2 rounded-full ${isGestor ? 'bg-amber-400' : 'bg-emerald-400'
+                    }`}
                 />
                 <span className="font-bold text-stone-800 dark:text-emerald-100">
                   {user.username}
