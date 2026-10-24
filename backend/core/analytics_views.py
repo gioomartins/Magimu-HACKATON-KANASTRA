@@ -1,12 +1,12 @@
 from decimal import Decimal
-from django.db import connection
+from django.db import connection, models
 from django.db.models import Count, Sum
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Recebivel
+from core.models import Fundo, PerfilUsuario, Recebivel
 from core.permissions import IsGestor
 
 
@@ -21,9 +21,18 @@ class AnalyticsDashboardView(APIView):
     def get(self, request, *args, **kwargs):
         # Escopo do fundo se o usuário autenticado for um fundo específico
         base_qs = Recebivel.objects.all()
-        username = request.user.username.strip() if request.user and request.user.is_authenticated else ""
-        if username and Recebivel.objects.filter(nome_fundo__iexact=username).exists():
-            base_qs = base_qs.filter(nome_fundo__iexact=username)
+        user = request.user
+        username = user.username.strip() if user and user.is_authenticated else ""
+        fundo_obj = None
+
+        if user and user.is_authenticated and username.lower() != 'admin':
+            fundo_obj = Fundo.objects.filter(usuario=user).first()
+            if fundo_obj:
+                base_qs = base_qs.filter(models.Q(nome_fundo__iexact=fundo_obj.nome) | models.Q(doc_fundo=fundo_obj.codigo))
+            elif Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+                base_qs = base_qs.filter(nome_fundo__iexact=username)
+            else:
+                base_qs = base_qs.none()
 
         # 1. Totalizadores de Operações
         total_notas = base_qs.count()
@@ -57,7 +66,16 @@ class AnalyticsDashboardView(APIView):
             try:
                 with connection.cursor() as cursor:
                     # Se houver filtro de fundo, aplica na query raw
-                    if username and Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+                    if fundo_obj:
+                        cursor.execute("""
+                            SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
+                            FROM antecipe_recebivel
+                            WHERE status = 'BARRADO' AND (LOWER(nome_fundo) = LOWER(%s) OR doc_fundo = %s)
+                            GROUP BY motivo
+                            ORDER BY total DESC
+                            LIMIT 8
+                        """, [fundo_obj.nome, fundo_obj.codigo])
+                    elif username and Recebivel.objects.filter(nome_fundo__iexact=username).exists():
                         cursor.execute("""
                             SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
                             FROM antecipe_recebivel
@@ -66,7 +84,7 @@ class AnalyticsDashboardView(APIView):
                             ORDER BY total DESC
                             LIMIT 8
                         """, [username])
-                    else:
+                    elif username.lower() == 'admin':
                         cursor.execute("""
                             SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
                             FROM antecipe_recebivel
@@ -74,6 +92,13 @@ class AnalyticsDashboardView(APIView):
                             GROUP BY motivo
                             ORDER BY total DESC
                             LIMIT 8
+                        """)
+                    else:
+                        cursor.execute("""
+                            SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
+                            FROM antecipe_recebivel
+                            WHERE 1=0
+                            GROUP BY motivo
                         """)
                     motivos_recusa = [
                         {"motivo": row[0], "total": int(row[1])}

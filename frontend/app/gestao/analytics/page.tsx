@@ -32,6 +32,7 @@ import {
 import { useAuth } from '@/lib/auth-context'
 import { fetchAnalyticsDashboard, AnalyticsData } from '@/lib/api'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { UploadLoteCsv } from '@/components/upload-lote-csv'
 
 // Paleta de cores alinhada à Kanastra e semântica de risco
@@ -123,12 +124,7 @@ export default function AnalyticsGestorPage() {
         name: m.motivo.replace(/_/g, ' '),
         value: m.total,
       }))
-      : [
-        { name: 'PRAZO MAXIMO', value: 12 },
-        { name: 'SITUACAO CADASTRAL', value: 8 },
-        { name: 'CONCENTRACAO SACADO', value: 5 },
-        { name: 'VALOR MINIMO', value: 3 },
-      ]
+      : []
 
   const sacadosBarData =
     data?.risco_concentracao && data.risco_concentracao.length > 0
@@ -138,13 +134,7 @@ export default function AnalyticsGestorPage() {
         exposicao: s.percentual_exposicao,
         cnpj: formatCNPJ(s.doc_sacado),
       }))
-      : [
-        { sacado: 'DISTRIBUIDORA ALFA', volume: 1540000, exposicao: 28.5, cnpj: '—' },
-        { sacado: 'LOGISTICA BETA', volume: 920000, exposicao: 17.1, cnpj: '—' },
-        { sacado: 'SUPERMERCADOS GAMA', volume: 640000, exposicao: 11.8, cnpj: '—' },
-        { sacado: 'DELTA COMERCIO', volume: 430000, exposicao: 8.0, cnpj: '—' },
-        { sacado: 'EPSILON IND E COM', volume: 290000, exposicao: 5.4, cnpj: '—' },
-      ]
+      : []
 
   const kpis = data?.kpis || {
     volume_total_aprovado: 0,
@@ -215,6 +205,7 @@ export default function AnalyticsGestorPage() {
               </button>
             </div>
 
+            <LanguageSwitcher />
             <ThemeToggle />
           </div>
         </header>
@@ -320,42 +311,54 @@ export default function AnalyticsGestorPage() {
               </p>
             </div>
 
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={motivosPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={95}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {motivosPieData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS_PIE[index % COLORS_PIE.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip
-                    formatter={(val: any) => [`${val} ocorrências`, 'Total']}
-                    contentStyle={{
-                      backgroundColor: '#0B2C20',
-                      borderColor: '#103B2C',
-                      borderRadius: '8px',
-                      color: '#F8F6F1',
-                      fontSize: '11px',
-                    }}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="h-72 w-full flex items-center justify-center">
+              {motivosPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={motivosPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={95}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {motivosPieData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS_PIE[index % COLORS_PIE.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      formatter={(val: any) => [`${val} ocorrências`, 'Total']}
+                      contentStyle={{
+                        backgroundColor: '#0B2C20',
+                        borderColor: '#103B2C',
+                        borderRadius: '8px',
+                        color: '#F8F6F1',
+                        fontSize: '11px',
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      iconType="circle"
+                      wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-6 text-stone-500">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+                    <ShieldCheck className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-semibold text-stone-700">Nenhuma recusa registrada</p>
+                  <p className="text-xs text-stone-500 mt-1 max-w-[240px]">
+                    Não há recebíveis rejeitados ou vinculados a este fundo no momento.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 rounded-xl border border-stone-200 bg-white/70 p-3 text-[11px] text-stone-600">
@@ -384,56 +387,68 @@ export default function AnalyticsGestorPage() {
               </span>
             </div>
 
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={sacadosBarData}
-                  layout="vertical"
-                  margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
-                    stroke="#64748B"
-                    fontSize={11}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="sacado"
-                    width={130}
-                    stroke="#0B2C20"
-                    fontSize={11}
-                    fontWeight={600}
-                  />
-                  <RechartsTooltip
-                    formatter={(val: any, name: any, item: any) => [
-                      `${formatCurrency(val)} (${item.payload.exposicao}% da carteira)`,
-                      'Volume Aprovado',
-                    ]}
-                    contentStyle={{
-                      backgroundColor: '#0B2C20',
-                      borderColor: '#103B2C',
-                      borderRadius: '8px',
-                      color: '#F8F6F1',
-                      fontSize: '11px',
-                    }}
-                  />
-                  <Bar
-                    dataKey="volume"
-                    fill="#0B2C20"
-                    radius={[0, 6, 6, 0]}
-                    barSize={20}
+            <div className="h-72 w-full flex items-center justify-center">
+              {sacadosBarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={sacadosBarData}
+                    layout="vertical"
+                    margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
                   >
-                    {sacadosBarData.map((entry, index) => (
-                      <Cell
-                        key={`bar-${index}`}
-                        fill={entry.exposicao > 20 ? '#E11D48' : '#0B2C20'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                    <XAxis
+                      type="number"
+                      tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`}
+                      stroke="#64748B"
+                      fontSize={11}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="sacado"
+                      width={130}
+                      stroke="#0B2C20"
+                      fontSize={11}
+                      fontWeight={600}
+                    />
+                    <RechartsTooltip
+                      formatter={(val: any, name: any, item: any) => [
+                        `${formatCurrency(val)} (${item.payload.exposicao}% da carteira)`,
+                        'Volume Aprovado',
+                      ]}
+                      contentStyle={{
+                        backgroundColor: '#0B2C20',
+                        borderColor: '#103B2C',
+                        borderRadius: '8px',
+                        color: '#F8F6F1',
+                        fontSize: '11px',
+                      }}
+                    />
+                    <Bar
+                      dataKey="volume"
+                      fill="#0B2C20"
+                      radius={[0, 6, 6, 0]}
+                      barSize={20}
+                    >
+                      {sacadosBarData.map((entry, index) => (
+                        <Cell
+                          key={`bar-${index}`}
+                          fill={entry.exposicao > 20 ? '#E11D48' : '#0B2C20'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-6 text-stone-500">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+                    <TrendingUp className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-semibold text-stone-700">Nenhum sacado registrado</p>
+                  <p className="text-xs text-stone-500 mt-1 max-w-[280px]">
+                    Não há títulos aprovados vinculados a este fundo para exibição de risco de concentração.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Tabela de Detalhamento dos Top 5 Sacados */}
@@ -448,25 +463,33 @@ export default function AnalyticsGestorPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-stone-800">
-                  {sacadosBarData.map((s, idx) => (
-                    <tr key={idx} className="hover:bg-emerald-50/50 transition">
-                      <td className="px-3 py-2 font-bold text-[#0B2C20]">{s.sacado}</td>
-                      <td className="px-3 py-2 font-mono text-stone-500">{s.cnpj || '—'}</td>
-                      <td className="px-3 py-2 text-right font-medium">
-                        {formatCurrency(s.volume)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <span
-                          className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${s.exposicao > 20
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                        >
-                          {s.exposicao}%
-                        </span>
+                  {sacadosBarData.length > 0 ? (
+                    sacadosBarData.map((s, idx) => (
+                      <tr key={idx} className="hover:bg-emerald-50/50 transition">
+                        <td className="px-3 py-2 font-bold text-[#0B2C20]">{s.sacado}</td>
+                        <td className="px-3 py-2 font-mono text-stone-500">{s.cnpj || '—'}</td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          {formatCurrency(s.volume)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span
+                            className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${s.exposicao > 20
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                          >
+                            {s.exposicao}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-xs text-stone-500">
+                        Nenhum registro para exibir.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

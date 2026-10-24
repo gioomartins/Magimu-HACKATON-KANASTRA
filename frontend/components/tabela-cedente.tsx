@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { fetchRecebiveis, RecebivelItem, uploadCSV } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { useTranslation } from 'react-i18next'
 import { DEMO_RECEBIVEIS } from '@/lib/demo-data'
 
 type SortColumn =
@@ -77,6 +78,7 @@ export function TabelaCedente({
   subtitulo?: string
 }) {
   const { user, isDemo } = useAuth()
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<RecebivelItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -308,17 +310,17 @@ export function TabelaCedente({
     <div className="space-y-6">
       {/* Cards de Métricas */}
       <div className="grid gap-3 md:grid-cols-3">
-        <MetricCard label="Notas no Sistema" value={totalCount.toLocaleString('pt-BR')} detail="recebíveis catalogados" />
+        <MetricCard label={t('dashboard.cards.notesInSystem')} value={totalCount.toLocaleString('pt-BR')} detail={t('dashboard.cards.notesDetail')} />
         <MetricCard
-          label="Total Aprovado na Página"
+          label={t('dashboard.cards.approvedInPage')}
           value={`R$ ${totalLiquidoAprovado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          detail="valor líquido pronto para antecipação"
+          detail={t('dashboard.cards.approvedDetail')}
           tone="positive"
         />
         <MetricCard
-          label="Status Geral"
+          label={t('dashboard.cards.generalStatus')}
           value={items.filter((i) => i.status === 'BARRADO').length.toString()}
-          detail="notas recusadas nesta página"
+          detail={t('dashboard.cards.rejectedDetail')}
           tone="negative"
         />
       </div>
@@ -346,7 +348,7 @@ export function TabelaCedente({
                     : 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100'
                 }`}
               >
-                {st === 'TODOS' ? 'Todas' : st === 'APROVADO' ? 'Aprovadas' : 'Recusadas'}
+                {st === 'TODOS' ? t('common.all') : st === 'APROVADO' ? t('dashboard.table.approved') : t('dashboard.table.rejected')}
               </button>
             ))}
 
@@ -365,18 +367,33 @@ export function TabelaCedente({
                   type="file"
                   ref={inputRef}
                   accept=".csv"
+                  disabled={isDemo || user.username.startsWith('demo_')}
                   onChange={handleFileUpload}
                   className="hidden"
                 />
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  disabled={uploading}
-                  title={`Submeter lote CSV de recebíveis do seu ${tipo === 'fundo' ? 'fundo' : 'cedente'}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2c20] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#124231] disabled:opacity-50 transition"
+                  disabled={uploading || isDemo || user.username.startsWith('demo_')}
+                  title={
+                    isDemo || user.username.startsWith('demo_')
+                      ? 'Upload desabilitado em modo demonstração (página de pura visualização).'
+                      : `Submeter lote CSV de recebíveis do seu ${tipo === 'fundo' ? 'fundo' : 'cedente'}`
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
+                    isDemo || user.username.startsWith('demo_')
+                      ? 'bg-stone-300 text-stone-500 cursor-not-allowed opacity-60 dark:bg-stone-800 dark:text-stone-500'
+                      : 'bg-[#0b2c20] text-white hover:bg-[#124231] disabled:opacity-50'
+                  }`}
                 >
                   <Upload size={13} className={uploading ? 'animate-bounce' : ''} />
-                  <span>{uploading ? 'Enviando...' : 'Enviar CSV'}</span>
+                  <span>
+                    {isDemo || user.username.startsWith('demo_')
+                      ? 'Upload (Demo Bloqueado)'
+                      : uploading
+                      ? 'Enviando...'
+                      : 'Enviar CSV'}
+                  </span>
                 </button>
               </>
             )}
@@ -432,7 +449,7 @@ export function TabelaCedente({
             <Search size={14} className="absolute left-3 top-3 text-stone-400" />
             <input
               type="text"
-              placeholder="Filtrar por Nº Nota..."
+              placeholder={t('dashboard.filters.searchDocPlaceholder')}
               value={filtroDoc}
               onChange={(e) => setFiltroDoc(e.target.value)}
               className="w-full rounded-lg border border-stone-200 bg-white py-2 pl-8 pr-3 text-xs text-stone-700"
@@ -442,7 +459,7 @@ export function TabelaCedente({
           <div>
             <input
               type="text"
-              placeholder="Filtrar por Sacado..."
+              placeholder={t('dashboard.filters.searchSacadoPlaceholder')}
               value={filtroSacado}
               onChange={(e) => setFiltroSacado(e.target.value)}
               className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700"
@@ -452,7 +469,7 @@ export function TabelaCedente({
           <div>
             <input
               type="text"
-              placeholder="Filtrar por Fundo..."
+              placeholder={t('dashboard.filters.searchFundoPlaceholder')}
               value={filtroFundo}
               onChange={(e) => setFiltroFundo(e.target.value)}
               className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-700"
@@ -466,7 +483,7 @@ export function TabelaCedente({
             {/* Header com botões de Toggle de Ordenação */}
             <div className="grid grid-cols-[1.2fr_1.8fr_1.8fr_1.1fr_1.2fr_1fr_0.8fr] border-b border-stone-200/80 px-4 pb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
               <div className="flex items-center gap-1.5">
-                <span>Nota</span>
+                <span>{t('dashboard.table.doc')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('nu_documento')}
@@ -484,7 +501,7 @@ export function TabelaCedente({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span>Fundo</span>
+                <span>{t('dashboard.table.fundo')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('nome_fundo')}
@@ -502,7 +519,7 @@ export function TabelaCedente({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span>Sacado</span>
+                <span>{t('dashboard.table.sacado')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('nome_sacado')}
@@ -520,7 +537,7 @@ export function TabelaCedente({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span>Vencimento</span>
+                <span>{t('dashboard.table.due')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('data_vencimento_original')}
@@ -538,7 +555,7 @@ export function TabelaCedente({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span>Valor Nominal</span>
+                <span>{t('dashboard.table.nominalValue')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('valor_nominal')}
@@ -556,14 +573,14 @@ export function TabelaCedente({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span>Status</span>
+                <span>{t('dashboard.table.status')}</span>
                 <button
                   type="button"
                   onClick={() => handleToggleSort('status')}
                   className={`rounded p-1 transition hover:bg-stone-200/70 ${
                     sortColumn === 'status' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
                   }`}
-                  title="Ordenar por Status (Aprovados primeiro / Recusadas primeiro)"
+                  title="Ordenar por Status"
                 >
                   {sortColumn === 'status' ? (
                     sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
@@ -573,7 +590,7 @@ export function TabelaCedente({
                 </button>
               </div>
 
-              <span className="text-right">Detalhes</span>
+              <span className="text-right">{t('dashboard.table.details')}</span>
             </div>
 
             {loading ? (
@@ -606,7 +623,7 @@ export function TabelaCedente({
                           }`}
                         >
                           {isAprovado ? <Check size={11} /> : <X size={11} />}
-                          {isAprovado ? 'Aprovada' : 'Recusada'}
+                          {isAprovado ? t('dashboard.table.approved') : t('dashboard.table.rejected')}
                         </span>
                       </span>
 

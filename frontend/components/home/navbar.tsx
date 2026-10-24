@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Menu, X, ArrowRight, Play, Building2, Wallet, ChevronDown } from 'lucide-react'
 import { ThemeToggle } from '../theme-toggle'
+import { LanguageSwitcher } from '../language-switcher'
 import { useAuth } from '@/lib/auth-context'
 import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
 
@@ -131,6 +132,7 @@ export function Navbar() {
 
         {/* Ações Desktop */}
         <div className="hidden md:flex items-center gap-3">
+          <LanguageSwitcher />
           <ThemeToggle />
 
           {/* Botão Demo com Dropdown */}
@@ -205,6 +207,7 @@ export function Navbar() {
 
         {/* Botão Mobile Hambúrguer */}
         <div className="flex md:hidden items-center gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
           <button
             type="button"

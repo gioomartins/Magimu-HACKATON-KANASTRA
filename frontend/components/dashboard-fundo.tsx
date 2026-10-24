@@ -191,33 +191,35 @@ export function DashboardFundo() {
         )}
       </section>
 
-      {/* Navegação por Abas (Tabs) */}
-      <div className="flex border-b border-stone-300">
-        <button
-          type="button"
-          onClick={() => setAbaAtiva('regras')}
-          className={`flex items-center gap-2 border-b-2 px-6 py-3.5 text-sm font-semibold transition-colors ${
-            abaAtiva === 'regras'
-              ? 'border-[#0b2c20] text-[#0b2c20]'
-              : 'border-transparent text-stone-500 hover:border-stone-400 hover:text-stone-800'
-          }`}
-        >
-          <Sliders size={16} />
-          Informações e Validações
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbaAtiva('recebiveis')}
-          className={`flex items-center gap-2 border-b-2 px-6 py-3.5 text-sm font-semibold transition-colors ${
-            abaAtiva === 'recebiveis'
-              ? 'border-[#0b2c20] text-[#0b2c20]'
-              : 'border-transparent text-stone-500 hover:border-stone-400 hover:text-stone-800'
-          }`}
-        >
-          <Table size={16} />
-          Tabela de Recebíveis e Estatísticas
-        </button>
-      </div>
+      {/* Navegação por Abas (Tabs) - Centralizada e na paleta institucional Antecipe (#0B2C20 / Emerald / Off-White) */}
+      <nav aria-label="Navegação da Área do Fundo" className="flex justify-center">
+        <div className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-900/15 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-emerald-500/20 dark:bg-[#103b2c]/80">
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('regras')}
+            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+              abaAtiva === 'regras'
+                ? 'bg-[#0b2c20] text-[#f8f6f1] shadow-md dark:bg-emerald-400 dark:text-[#0b2c20]'
+                : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900 dark:text-emerald-100/70 dark:hover:bg-emerald-900/50 dark:hover:text-emerald-200'
+            }`}
+          >
+            <Sliders size={15} />
+            <span>Informações e Validações</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('recebiveis')}
+            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+              abaAtiva === 'recebiveis'
+                ? 'bg-[#0b2c20] text-[#f8f6f1] shadow-md dark:bg-emerald-400 dark:text-[#0b2c20]'
+                : 'text-stone-600 hover:bg-stone-200/50 hover:text-stone-900 dark:text-emerald-100/70 dark:hover:bg-emerald-900/50 dark:hover:text-emerald-200'
+            }`}
+          >
+            <Table size={15} />
+            <span>Tabela de Recebíveis e Estatísticas</span>
+          </button>
+        </div>
+      </nav>
 
       {abaAtiva === 'regras' && (
         <div className="space-y-8">

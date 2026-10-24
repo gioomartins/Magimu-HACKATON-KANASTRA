@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/components/theme-provider'
+import { I18nProvider } from '@/components/i18n-provider'
 import './globals.css'
 
 
@@ -142,9 +143,11 @@ export default function RootLayout({
           Pular para o conteúdo principal
         </a>
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <I18nProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </I18nProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
