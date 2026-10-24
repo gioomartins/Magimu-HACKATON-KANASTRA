@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from datetime import date, timedelta
 from pathlib import Path
+import dj_database_url
 
 from dotenv import load_dotenv
 
@@ -113,16 +114,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'antecipe'),
-        'USER': os.getenv('POSTGRES_USER', 'antecipe'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'antecipe'),
-        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
-        'PORT': os.getenv('POSTGRES_PORT', '5432'),
-        # Reaproveita conexões entre requests (uploads grandes fazem muitas queries).
-        'CONN_MAX_AGE': int(os.getenv('POSTGRES_CONN_MAX_AGE', '60')),
-    }
+    'default': dj_database_url.config(
+        default=f"postgres://{os.getenv('POSTGRES_USER', 'antecipe')}:{os.getenv('POSTGRES_PASSWORD', 'antecipe')}@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'antecipe')}",
+        conn_max_age=int(os.getenv('POSTGRES_CONN_MAX_AGE', '60')),
+    )
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
