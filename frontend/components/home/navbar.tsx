@@ -1,16 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { Menu, X, ArrowRight } from 'lucide-react'
+import { Menu, X, ArrowRight, Play, Building2, Wallet, ChevronDown } from 'lucide-react'
 import { ThemeToggle } from '../theme-toggle'
 import { useAuth } from '@/lib/auth-context'
+import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
 
 export function Navbar() {
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, loginDemo } = useAuth()
   const [menuAberto, setMenuAberto] = useState(false)
+  const [demoMenuAberto, setDemoMenuAberto] = useState(false)
+  const demoRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -20,9 +25,29 @@ export function Navbar() {
     const onScroll = () => {
       setScrolled(window.scrollY > 20)
     }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (demoRef.current && !demoRef.current.contains(e.target as Node)) {
+        setDemoMenuAberto(false)
+      }
+    }
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
+
+  const handleEntrarDemo = (tipo: 'cedente' | 'fundo') => {
+    setDemoMenuAberto(false)
+    setMenuAberto(false)
+    if (tipo === 'cedente') {
+      loginDemo(DEMO_CEDENTE_USER)
+    } else {
+      loginDemo(DEMO_FUNDO_USER)
+    }
+    router.push('/plataforma')
+  }
 
   // Trava rolagem do body quando menu mobile está aberto e escuta tecla Esc
   useEffect(() => {
@@ -107,6 +132,50 @@ export function Navbar() {
         {/* Ações Desktop */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
+
+          {/* Botão Demo com Dropdown */}
+          <div className="relative" ref={demoRef}>
+            <button
+              type="button"
+              onClick={() => setDemoMenuAberto(!demoMenuAberto)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-emerald-600/30 bg-emerald-500/10 px-3.5 text-xs font-bold uppercase tracking-wider text-emerald-800 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 transition"
+            >
+              <Play size={13} className="text-emerald-600 dark:text-emerald-400 fill-emerald-600 dark:fill-emerald-400" />
+              <span>Demo</span>
+              <ChevronDown size={13} className={`transition-transform duration-200 ${demoMenuAberto ? 'rotate-180' : ''}`} />
+            </button>
+
+            {demoMenuAberto && (
+              <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-stone-200 bg-[#f8f6f1] p-2 shadow-2xl dark:border-emerald-500/20 dark:bg-[#103b2c] animate-in fade-in zoom-in-95 z-50">
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-emerald-200/60">
+                  Visualização Rápida (Em memória)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleEntrarDemo('cedente')}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-stone-800 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50 transition"
+                >
+                  <Building2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+                  <div>
+                    <div className="font-bold">Área do Cedente</div>
+                    <div className="text-[10px] text-stone-500 dark:text-emerald-200/60">Ver notas & antecipação</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleEntrarDemo('fundo')}
+                  className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-stone-800 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-emerald-900/50 transition"
+                >
+                  <Wallet size={16} className="text-emerald-600 dark:text-emerald-400" />
+                  <div>
+                    <div className="font-bold">Área do Fundo</div>
+                    <div className="text-[10px] text-stone-500 dark:text-emerald-200/60">Regras, taxas & carteira</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
           {user ? (
             <Link
               href="/plataforma"
@@ -190,7 +259,29 @@ export function Navbar() {
             </a>
           </nav>
 
-          <div className="mt-8 pt-4">
+          <div className="mt-8 space-y-3 pt-4">
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-3 dark:bg-emerald-950/30">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                Visualização Rápida (Demo)
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEntrarDemo('cedente')}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-white p-2 text-xs font-bold text-stone-800 shadow-xs dark:bg-[#103b2c] dark:text-emerald-200"
+                >
+                  <Building2 size={14} /> Cedente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleEntrarDemo('fundo')}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-white p-2 text-xs font-bold text-stone-800 shadow-xs dark:bg-[#103b2c] dark:text-emerald-200"
+                >
+                  <Wallet size={14} /> Fundo
+                </button>
+              </div>
+            </div>
+
             <Link
               href={user ? "/plataforma" : "/login"}
               onClick={fecharMenu}

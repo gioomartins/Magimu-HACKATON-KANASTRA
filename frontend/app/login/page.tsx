@@ -7,10 +7,11 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Lock, User, AlertCircle, ShieldCheck } from 'lucide-react'
 import { loginApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { login, loginDemo } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -125,37 +126,40 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Acesso Rápido para Avaliação / Testes */}
+        {/* Acesso Rápido para Avaliação / Modo Demonstração */}
         <div className="mt-6 rounded-xl border border-emerald-900/10 bg-emerald-50/70 p-3.5">
           <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
-            Credenciais Padrão de Teste (1-Clique)
+            Modo Demonstração Instantâneo (1-Clique)
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <p className="mt-1 text-[11px] text-stone-600">
+            Visualize as páginas e funcionalidades com dados de teste em memória, sem salvar cookies:
+          </p>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => {
-                setUsername('cedente_demo')
-                setPassword('password123')
+                loginDemo(DEMO_CEDENTE_USER)
+                router.push('/plataforma')
               }}
-              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
+              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
             >
-              <span className="block font-bold">Cedente (Empresa)</span>
-              <span className="text-[10px] text-stone-500">cedente_demo</span>
+              <span className="block font-bold">Ver como Cedente</span>
+              <span className="text-[10px] text-stone-500">Empresa Demo</span>
             </button>
             <button
               type="button"
               onClick={() => {
-                setUsername('gestor_demo')
-                setPassword('password123')
+                loginDemo(DEMO_FUNDO_USER)
+                router.push('/plataforma')
               }}
-              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
+              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
             >
-              <span className="block font-bold">Fundo (Gestor)</span>
-              <span className="text-[10px] text-stone-500">gestor_demo</span>
+              <span className="block font-bold">Ver como Fundo</span>
+              <span className="text-[10px] text-stone-500">Gestor FIDC Demo</span>
             </button>
           </div>
-          <p className="mt-2 text-[10px] leading-relaxed text-emerald-800/80">
-            💡 Contas geradas por arquivos CSV de população usam o <strong>nome exato do Cedente ou Fundo</strong> como usuário e senha <strong>123456</strong>.
+          <p className="mt-2.5 text-[10px] leading-relaxed text-emerald-800/80">
+            💡 Contas criadas ao popular o sistema por CSV utilizam o <strong>nome exato da instituição</strong> e senha <strong>123456</strong>. Para a conta mestra, utilize <strong>admin</strong>.
           </p>
         </div>
 

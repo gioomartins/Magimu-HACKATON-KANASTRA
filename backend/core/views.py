@@ -122,12 +122,33 @@ def upload_csv_view(request):
             tmp.write(chunk)
         temp_path = Path(tmp.name)
 
+    user = request.user
+    doc_filtro = None
+    papel_filtro = None
+
+    # Se for usuário autenticado comum (não admin geral da população):
+    # restringe o processamento estritamente ao CNPJ cadastrado do cedente ou fundo
+    if user and user.is_authenticated and user.username.lower() != 'admin':
+        perfil = getattr(user, 'perfil', None)
+        if perfil and perfil.role == PerfilUsuario.Role.EMPRESA:
+            cedente = Cedente.objects.filter(usuario=user).first()
+            if cedente and cedente.codigo:
+                doc_filtro = cedente.codigo
+                papel_filtro = 'EMPRESA'
+        elif perfil and perfil.role == PerfilUsuario.Role.GESTOR:
+            fundo = Fundo.objects.filter(usuario=user).first()
+            if fundo and fundo.codigo:
+                doc_filtro = fundo.codigo
+                papel_filtro = 'GESTOR'
+
     service = ImportadorCSVService()
     try:
-        lote, registros_log = service.processar_arquivo(
+        lote, registros_log, total_ignorados = service.processar_arquivo(
             arquivo_ou_caminho=temp_path,
             nome_arquivo=arquivo.name,
             caminho_log=caminho_log,
+            doc_filtro=doc_filtro,
+            papel_filtro=papel_filtro,
         )
     except Exception as e:
         if temp_path.exists():
@@ -147,6 +168,9 @@ def upload_csv_view(request):
             'lote': LoteImportacaoSerializer(lote).data,
             'arquivo_log': str(caminho_log.name),
             'amostra_log': registros_log[:25],
+            'total_ignorados': total_ignorados,
+            'doc_filtro': doc_filtro,
+            'papel_filtro': papel_filtro,
         },
         status=status.HTTP_201_CREATED,
     )

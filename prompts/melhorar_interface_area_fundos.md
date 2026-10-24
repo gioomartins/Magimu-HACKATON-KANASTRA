@@ -1,1 +1,0 @@
-Melhore a interface da plataforma da Área de Fundos, criando um navbar que tenha duas opções: uma para mostrar os campos de informação e de verificação, e outro para mostrar a tabela de recebíveis e suas estatísticas.

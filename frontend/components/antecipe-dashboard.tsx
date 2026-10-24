@@ -3,16 +3,17 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BarChart3, Building2, LogOut, RefreshCw, User, Wallet } from 'lucide-react'
+import { ArrowLeft, BarChart3, Building2, LogOut, RefreshCw, Sparkles, User, Wallet } from 'lucide-react'
 import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
 import { UploadLoteCsv } from './upload-lote-csv'
 import { ThemeToggle } from './theme-toggle'
 import { useAuth } from '@/lib/auth-context'
+import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
 
 export function AntecipeDashboard() {
   const router = useRouter()
-  const { user, isLoading, logout } = useAuth()
+  const { user, isDemo, isLoading, loginDemo, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // Se o usuário não estiver autenticado e não estiver em processo de logout, redireciona para login
@@ -46,6 +47,39 @@ export function AntecipeDashboard() {
 
   return (
     <main id="conteudo-principal" className="min-h-screen bg-[#f8f6f1] text-stone-900 transition-colors duration-200 dark:bg-[#0b2c20] dark:text-stone-100">
+      {/* Banner de Demonstração em Memória */}
+      {(isDemo || user.username.startsWith('demo_')) && (
+        <div className="bg-emerald-700 px-4 py-2 text-center text-xs font-semibold text-emerald-50 shadow-sm">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <Sparkles size={14} className="text-emerald-200" />
+              <span>Modo Demonstração (Em Memória · Sem Cookies)</span>
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-emerald-200">Alternar pré-visualização:</span>
+              <button
+                type="button"
+                onClick={() => loginDemo(DEMO_CEDENTE_USER)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-bold uppercase transition ${
+                  !isGestor ? 'bg-white text-emerald-900 shadow-xs' : 'bg-emerald-800/80 text-emerald-200 hover:bg-emerald-800'
+                }`}
+              >
+                Cedente
+              </button>
+              <button
+                type="button"
+                onClick={() => loginDemo(DEMO_FUNDO_USER)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-bold uppercase transition ${
+                  isGestor ? 'bg-white text-emerald-900 shadow-xs' : 'bg-emerald-800/80 text-emerald-200 hover:bg-emerald-800'
+                }`}
+              >
+                Fundo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 lg:px-12 lg:py-8">
         {/* Barra Superior / Header */}
         <header className="mb-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">

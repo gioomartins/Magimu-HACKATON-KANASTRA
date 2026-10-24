@@ -95,23 +95,35 @@ class ImportadorCSVService:
         return situacoes
 
     def pre_calcular_concentracao(
-        self, arquivo_ou_caminho: Any
+        self, arquivo_ou_caminho: Any, doc_filtro: Optional[str] = None, papel_filtro: Optional[str] = None
     ) -> Tuple[Dict[str, Decimal], Dict[Tuple[str, str], Decimal], Dict[Tuple[str, str], Decimal]]:
         """
         Faz uma passada rápida de agregação para regras de concentração:
         - Total por fundo: doc_fundo -> soma
         - Total por sacado raiz: (doc_fundo, raiz_sacado) -> soma
         - Total por cedente: (doc_fundo, doc_cedente) -> soma
+        Se doc_filtro for fornecido, linhas fora do escopo são ignoradas.
         """
         totais_fundo: Dict[str, Decimal] = {}
         totais_sacado: Dict[Tuple[str, str], Decimal] = {}
         totais_cedente: Dict[Tuple[str, str], Decimal] = {}
+
+        doc_filtro_limpo = somente_digitos(doc_filtro) if doc_filtro else None
 
         leitor = self._obter_leitor_csv(arquivo_ou_caminho)
         for row in leitor:
             try:
                 fundo = row["DOC_FUNDO"].strip()
                 cedente = row["DOC_CEDENTE"].strip()
+
+                if doc_filtro_limpo:
+                    if papel_filtro == 'EMPRESA':
+                        if somente_digitos(cedente) != doc_filtro_limpo:
+                            continue
+                    elif papel_filtro == 'GESTOR':
+                        if somente_digitos(fundo) != doc_filtro_limpo:
+                            continue
+
                 sacado = row["DOC_SACADO"].strip()
                 raiz_sac = raiz_cnpj(sacado)
                 val = parse_decimal_br(row["VALOR_NOMINAL"])
@@ -146,14 +158,23 @@ class ImportadorCSVService:
 
     @profile_performance("Ingestão CSV & Validação em Lote")
     def processar_arquivo(
-        self, arquivo_ou_caminho: Any, nome_arquivo: str, caminho_log: Optional[Path] = None
-    ) -> Tuple[LoteImportacao, List[Dict[str, Any]]]:
+        self,
+        arquivo_ou_caminho: Any,
+        nome_arquivo: str,
+        caminho_log: Optional[Path] = None,
+        doc_filtro: Optional[str] = None,
+        papel_filtro: Optional[str] = None,
+    ) -> Tuple[LoteImportacao, List[Dict[str, Any]], int]:
         """
         Executa a leitura sequencial, validação das notas e submissão ao banco.
-        Retorna o LoteImportacao criado e a lista de registros de auditoria/log.
+        Se doc_filtro for fornecido, apenas notas cujo CNPJ do cedente ou fundo coincida
+        são processadas; registros com outros CNPJs são ignorados e contabilizados em total_ignorados.
+        Retorna (LoteImportacao, registros_log, total_ignorados).
         """
         # 1. Pré-cálculo para contexto de concentração
-        totais_fundo, totais_sacado, totais_cedente = self.pre_calcular_concentracao(arquivo_ou_caminho)
+        totais_fundo, totais_sacado, totais_cedente = self.pre_calcular_concentracao(
+            arquivo_ou_caminho, doc_filtro=doc_filtro, papel_filtro=papel_filtro
+        )
         situacoes = self.carregar_situacoes_cadastrais()
         contexto = ContextoValidacao(
             data_base=self.data_base,
@@ -193,15 +214,32 @@ class ImportadorCSVService:
         total_linhas = 0
         total_aprovados = 0
         total_barrados = 0
+        total_ignorados = 0
         val_nom_total = Decimal(0)
         val_nom_aprov = Decimal(0)
         val_liq_aprov = Decimal(0)
         val_nom_barr = Decimal(0)
 
+        doc_filtro_limpo = somente_digitos(doc_filtro) if doc_filtro else None
+
         leitor = self._obter_leitor_csv(arquivo_ou_caminho)
         chunk_size = getattr(settings, "ANTECIPE_CHUNK_SIZE", 5000)
 
         for num_linha, row in enumerate(leitor, start=2):
+            doc_cedente = row.get("DOC_CEDENTE", "").strip()
+            doc_fundo = row.get("DOC_FUNDO", "").strip()
+
+            # Verificação estrita de pertinência de CNPJ caso doc_filtro esteja ativo
+            if doc_filtro_limpo:
+                if papel_filtro == 'EMPRESA':
+                    if somente_digitos(doc_cedente) != doc_filtro_limpo:
+                        total_ignorados += 1
+                        continue
+                elif papel_filtro == 'GESTOR':
+                    if somente_digitos(doc_fundo) != doc_filtro_limpo:
+                        total_ignorados += 1
+                        continue
+
             total_linhas += 1
             nu_doc = row.get("NU_DOCUMENTO", "").strip()
             try:
@@ -223,9 +261,7 @@ class ImportadorCSVService:
             val_nom_total += valor
             nome_fundo = row.get("NOME_FUNDO", "").strip()
             nome_cedente = row.get("NOME_CEDENTE", "").strip()
-            doc_cedente = row["DOC_CEDENTE"].strip()
             doc_sacado = row["DOC_SACADO"].strip()
-            doc_fundo = row["DOC_FUNDO"].strip()
             tipo_rec = row["TIPO_RECEBIVEL"].strip()
 
             if nome_fundo and nome_fundo not in fundos_vistos:
@@ -391,7 +427,7 @@ class ImportadorCSVService:
             with open(caminho_log, "w", encoding="utf-8") as flog:
                 json.dump(registros_log, flog, ensure_ascii=False, indent=2)
 
-        return lote, registros_log
+        return lote, registros_log, total_ignorados
 
     def _criar_contas_populacao(self, fundos: Dict[str, str], cedentes: Dict[str, str]) -> None:
         """

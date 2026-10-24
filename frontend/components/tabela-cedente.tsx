@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { fetchRecebiveis, RecebivelItem, uploadCSV } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { DEMO_RECEBIVEIS } from '@/lib/demo-data'
 
 type SortColumn =
   | 'nu_documento'
@@ -75,7 +76,7 @@ export function TabelaCedente({
   titulo?: string
   subtitulo?: string
 }) {
-  const { user } = useAuth()
+  const { user, isDemo } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<RecebivelItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -83,12 +84,23 @@ export function TabelaCedente({
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const [toastIgnorados, setToastIgnorados] = useState<{ total: number; mensagem: string } | null>(null)
 
   // Filtros
   const [statusFilter, setStatusFilter] = useState<'TODOS' | 'APROVADO' | 'BARRADO'>('TODOS')
   const [filtroDoc, setFiltroDoc] = useState('')
   const [filtroSacado, setFiltroSacado] = useState('')
   const [filtroFundo, setFiltroFundo] = useState('')
+
+  // Auto-dismiss do pop-up vermelho de canto de tela após 6 segundos
+  useEffect(() => {
+    if (toastIgnorados) {
+      const timer = setTimeout(() => {
+        setToastIgnorados(null)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [toastIgnorados])
 
   // Ordenação
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
@@ -101,6 +113,22 @@ export function TabelaCedente({
 
   const carregarDados = async () => {
     setLoading(true)
+    if (isDemo || user?.username?.startsWith('demo_')) {
+      let filtered = [...DEMO_RECEBIVEIS]
+      if (statusFilter !== 'TODOS') {
+        filtered = filtered.filter((i) => i.status === statusFilter)
+      }
+      if (filtroDoc) {
+        filtered = filtered.filter((i) =>
+          i.nu_documento.toLowerCase().includes(filtroDoc.toLowerCase())
+        )
+      }
+      setItems(filtered)
+      setTotalCount(filtered.length)
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetchRecebiveis({
         page,
@@ -149,14 +177,27 @@ export function TabelaCedente({
     if (!file) return
     setUploading(true)
     setUploadMsg(null)
+    setToastIgnorados(null)
     try {
       const res = await uploadCSV(file)
       const aprovados = res.lote?.total_aprovados ?? 0
       const barrados = res.lote?.total_barrados ?? 0
+      const ignorados = res.total_ignorados ?? 0
+
       setUploadMsg({
         tipo: 'ok',
-        texto: `Lote submetido com sucesso! ${aprovados} aprovados, ${barrados} recusados/duplicados.`,
+        texto: `Lote processado com sucesso! ${aprovados} aprovados, ${barrados} recusados/duplicados.`,
       })
+
+      // Se houver registros ignorados por não coincidirem com o CNPJ cadastrado, dispara o pop-up vermelho
+      if (ignorados > 0) {
+        const papelStr = tipo === 'fundo' ? 'fundo' : 'cedente'
+        setToastIgnorados({
+          total: ignorados,
+          mensagem: `${ignorados} recebíveis foram ignorados por pertencerem a outros CNPJs e não coincidirem com seu CNPJ de ${papelStr} cadastrado.`,
+        })
+      }
+
       setPage(1)
       await carregarDados()
     } catch (err: any) {
@@ -317,8 +358,8 @@ export function TabelaCedente({
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
 
-            {/* Botão de Envio de CSV interno da Área do Cedente */}
-            {tipo === 'cedente' && user && (
+            {/* Botão de Envio de CSV interno da Área do Cedente ou Fundo */}
+            {user && (
               <>
                 <input
                   type="file"
@@ -331,7 +372,7 @@ export function TabelaCedente({
                   type="button"
                   onClick={() => inputRef.current?.click()}
                   disabled={uploading}
-                  title="Submeter novo lote de recebíveis via CSV"
+                  title={`Submeter lote CSV de recebíveis do seu ${tipo === 'fundo' ? 'fundo' : 'cedente'}`}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2c20] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#124231] disabled:opacity-50 transition"
                 >
                   <Upload size={13} className={uploading ? 'animate-bounce' : ''} />

@@ -6,6 +6,122 @@
 
 ---
 
+## 🚀 Guia Rápido de Execução e Fluxo do Sistema
+
+### 1. Como instalar todas as dependências necessárias
+
+#### Pré-requisitos
+- **Python 3.12+** e gerenciador [uv](https://docs.astral.sh/uv/) (ou pip tradicional)
+- **Node.js 20+** e **pnpm** (ou **npm**)
+- **Docker** e **Docker Compose** (para PostgreSQL 17)
+
+#### Comandos de Instalação:
+```bash
+# 1. Clone o repositório e acerte as permissões se necessário
+git clone https://github.com/gioomartins/Magimu-HACKATON-KANASTRA.git
+cd Magimu-HACKATON-KANASTRA
+
+# 2. Instalar dependências do Backend (Python com uv)
+cd backend
+uv sync
+cd ..
+
+# 3. Instalar dependências do Frontend (Next.js com pnpm ou npm)
+cd frontend
+pnpm install # ou npm install
+cd ..
+```
+
+---
+
+### 2. Setup do Banco de Dados, Criação do Admin e População
+
+Criamos um script automatizado `setup.py` na raiz do projeto que executa as migrações, importa as situações cadastrais da Receita e cria a conta mestre do Administrador:
+
+```bash
+# Na raiz do projeto, execute:
+python3 setup.py
+```
+
+> **Saída explícita impressa no terminal:**
+> ```text
+> ======================================================================
+> [SETUP CONCLUIDO COM SUCESSO]
+> Credenciais do Administrador Geral:
+>   - Usuario: admin
+>   - Senha:   password123
+> ======================================================================
+> ```
+
+#### Tutorial de População do Banco de Dados:
+- **Via Script Automático:** Caso queira popular instantaneamente com o arquivo oficial da Kanastra via terminal:
+  ```bash
+  cd backend
+  uv run python manage.py popular_dados --caminho ../base_hackathon_final_transparencia.csv
+  cd ..
+  ```
+- **Via Interface Gráfica:**
+  1. Acesse o sistema pelo navegador em `http://localhost:3000/login`;
+  2. Faça login com o usuário **admin** e senha **password123**;
+  3. Na Dashboard Principal, acesse a área **"População do Sistema & Submissão em Lote (CSV)"**;
+  4. Arraste ou selecione o arquivo CSV (como `base_hackathon_final_transparencia.csv`). O sistema processará em streaming de alta performance e gerará automaticamente as contas para cada Cedente e Fundo presente no arquivo (com senha padrão `123456`).
+
+---
+
+### 3. Como Inicializar o Backend e o Frontend
+
+Abra dois terminais (ou use abas separadas):
+
+**Terminal 1 — Backend (API Django REST):**
+```bash
+cd backend
+uv run python manage.py runserver 0.0.0.0:8000
+```
+*A API estará disponível em `http://localhost:8000/api/`.*
+
+**Terminal 2 — Frontend (Next.js App Router):**
+```bash
+cd frontend
+pnpm dev # ou npm run dev
+```
+*Acesse a aplicação no navegador em `http://localhost:3000`.*
+
+---
+
+### 4. Como Rodar a Suíte de Testes
+
+Os testes cobrem a integridade dos validadores, cálculo de desconto simples, idempotência intralote e matriz de permissões RBAC:
+
+```bash
+cd backend
+uv run python manage.py test core --verbosity 2
+cd ..
+```
+
+---
+
+### 5. Como Usar a Plataforma (Passo a Passo)
+
+- **Acesso Instantâneo sem Login (Modo Demonstração):**
+  - Na barra de navegação ou na tela de login, clique no botão **Demo** e selecione **Área do Cedente** ou **Área do Fundo**.
+  - Esse modo opera 100% em memória, com dados simulados e sem salvar cookies no navegador, ideal para avaliação ágil da interface e interações.
+
+- **Área do Cedente (Empresas Antecipadoras):**
+  - **Upload Interno de CSV:** Envie lotes de faturas e duplicatas diretamente pela sua área de trabalho.
+  - **Métricas Consolidadas:** Visualize total submetido, volume aprovado e valor líquido descontado para antecipação.
+  - **Tabela Interativa e Ordenável:** Todas as colunas (Nº Documento, Fundo, Sacado, Vencimento, Valor Nominal e Status) possuem botões de ordenação crescente/decrescente, além de um botão de restauração no canto superior direito.
+  - **Pageamento Inteligente:** Navegue facilmente com botões de Primeira/Última página e links rápidos para páginas adjacentes.
+  - **Transparência de Recusa:** Clique em qualquer nota com status `BARRADO` para abrir o modal com o diagnóstico em linguagem clara sobre o critério do fundo que barrou o título.
+
+- **Área do Fundo (Governança, Crédito & FIDC):**
+  - **Navegação em Abas:**
+    - **Aba "Informações e Validações":** Edite dados do fundo, taxa de desconto mensal (% a.m.) e configure os validadores de crédito FIDC (ex: situação na Receita via botões de rádio `ATIVA`, `SUSPENSA`, `INAPTA`; tipos de recebíveis aceitos via checkboxes `DUPLICATA`, `CHEQUE`, `CARTAO`, `CONTRATO`; limites de valor e prazo).
+    - **Aba "Tabela de Recebíveis e Estatísticas":** Monitore a carteira total sob gestão, filtre por sacados e confira métricas em tempo real.
+  - **Exportar e Importar JSON:** Exporte as políticas do fundo em arquivo `.json` ou importe novas configurações estruturadas instantaneamente com recálculo retroativo da carteira.
+  - **Painel de Analytics & Risco:** Acesse gráficos de distribuição, concentrações por sacado e relatórios executivos.
+
+---
+
 ## 📑 Sumário Executivo
 
 - [1. Visão Geral e Valor de Negócio](#1-visão-geral-e-valor-de-negócio)
@@ -37,15 +153,13 @@ No ecossistema de crédito e securitização (FIDCs), a antecipação de recebí
 
 ## 2. Credenciais de Teste Padrão (Acesso Rápido)
 
-Para facilitar a auditoria e a avaliação da banca avaliadora, o sistema já disponibiliza contas pré-configuradas com diferentes níveis de privilégio (RBAC). A tela de login (`/login`) dispõe inclusive de atalhos de 1-clique para preenchimento automático.
+Para facilitar a auditoria e a avaliação da banca avaliadora, o sistema já disponibiliza contas pré-configuradas com diferentes níveis de privilégio (RBAC).
 
 | Perfil / Papel | Usuário | Senha | Escopo de Acesso na Plataforma |
 | :--- | :--- | :--- | :--- |
 | **Administrador Geral** | `admin` | `password123` | **Super Gestor / População:** Acesso exclusivo ao dropzone de importação massiva (CSV) na dashboard principal para popular o sistema, criando ou atualizando automaticamente contas de cedentes e fundos com sincronização de senhas. |
-| **Cedente (Empresa)** | `cedente_demo` | `password123` | **Faceta do Cedente:** Upload interno de arquivos CSV para a própria conta, listagem paginada (20/20 com saltos diretos e páginas vizinhas), ordenação por toggle em cada coluna, detalhamento com explicação de recusas, simulação financeira em tempo real. Bloqueado de alterar regras do fundo (`403 Forbidden`). |
-| **Fundo (Gestor)** | `gestor_demo` | `password123` | **Acesso Completo:** Todas as funções da empresa + **Área dos Fundos:** Visualização da carteira sob gestão com ordenação em todas as colunas, parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
-
-> *Nota:* Usuários alternativos adicionais disponíveis: `empresa_demo` (Empresa) e `fundo_demo` (Gestor), ambos com a senha `password123`. A conta `admin` é reservada para administração e não possui atalho rápido de preenchimento na tela de login por motivos de segurança.
+| **Cedente (Empresa)** | Contas geradas por CSV ou Modo Demo | `123456` ou 1-Clique Demo | **Faceta do Cedente:** Upload interno de arquivos CSV para a própria conta, listagem paginada (20/20 com saltos diretos e páginas vizinhas), ordenação por toggle em cada coluna, detalhamento com explicação de recusas, simulação financeira em tempo real. |
+| **Fundo (Gestor)** | Contas geradas por CSV ou Modo Demo | `123456` ou 1-Clique Demo | **Acesso Completo:** Todas as funções da empresa + **Área dos Fundos:** Visualização da carteira sob gestão com abas de separação entre validações e tabela de recebíveis, parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
 
 ---
 

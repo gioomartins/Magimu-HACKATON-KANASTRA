@@ -1,11 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Download, FileJson, RefreshCw, Save, ShieldCheck, Sparkles, Upload } from 'lucide-react'
+import { Download, FileJson, RefreshCw, Save, ShieldCheck, Sparkles, Upload, Sliders, Table } from 'lucide-react'
 import { fetchRegras, FundoConfig, updateRegras } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+import { DEMO_CONFIG_FUNDO } from '@/lib/demo-data'
 import { TabelaCedente } from './tabela-cedente'
 
 export function DashboardFundo() {
+  const { user, isDemo } = useAuth()
+  const [abaAtiva, setAbaAtiva] = useState<'regras' | 'recebiveis'>('regras')
   const [config, setConfig] = useState<FundoConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -16,6 +20,13 @@ export function DashboardFundo() {
   const carregar = async () => {
     setLoading(true)
     setMsg(null)
+    if (isDemo || user?.username?.startsWith('demo_')) {
+      setConfig(DEMO_CONFIG_FUNDO)
+      setJsonText(JSON.stringify(DEMO_CONFIG_FUNDO, null, 2))
+      setLoading(false)
+      return
+    }
+
     try {
       const data = await fetchRegras()
       setConfig(data)
@@ -36,6 +47,17 @@ export function DashboardFundo() {
     if (!payload) return
     setSaving(true)
     setMsg(null)
+
+    if (isDemo || user?.username?.startsWith('demo_')) {
+      setConfig(payload)
+      setJsonText(JSON.stringify(payload, null, 2))
+      setSaving(false)
+      setMsg({
+        tipo: 'ok',
+        texto: 'Configuração simulada com sucesso! Em modo demonstração, as regras e filtros reagem dinamicamente.',
+      })
+      return
+    }
     try {
       const res = await updateRegras(payload)
       setConfig(payload)
@@ -169,8 +191,38 @@ export function DashboardFundo() {
         )}
       </section>
 
-      {/* Precificação e Fundo */}
-      <section className="grid gap-6 md:grid-cols-2">
+      {/* Navegação por Abas (Tabs) */}
+      <div className="flex border-b border-stone-300">
+        <button
+          type="button"
+          onClick={() => setAbaAtiva('regras')}
+          className={`flex items-center gap-2 border-b-2 px-6 py-3.5 text-sm font-semibold transition-colors ${
+            abaAtiva === 'regras'
+              ? 'border-[#0b2c20] text-[#0b2c20]'
+              : 'border-transparent text-stone-500 hover:border-stone-400 hover:text-stone-800'
+          }`}
+        >
+          <Sliders size={16} />
+          Informações e Validações
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbaAtiva('recebiveis')}
+          className={`flex items-center gap-2 border-b-2 px-6 py-3.5 text-sm font-semibold transition-colors ${
+            abaAtiva === 'recebiveis'
+              ? 'border-[#0b2c20] text-[#0b2c20]'
+              : 'border-transparent text-stone-500 hover:border-stone-400 hover:text-stone-800'
+          }`}
+        >
+          <Table size={16} />
+          Tabela de Recebíveis e Estatísticas
+        </button>
+      </div>
+
+      {abaAtiva === 'regras' && (
+        <div className="space-y-8">
+          {/* Precificação e Fundo */}
+          <section className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-stone-200/80 bg-[#f8f6f1] p-6 text-stone-800 shadow">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">Cadastro do Fundo</p>
           <div className="mt-4 space-y-4">
@@ -482,15 +534,19 @@ export function DashboardFundo() {
           </div>
         )}
       </section>
+        </div>
+      )}
 
       {/* Carteira de Recebíveis do Fundo com ordenação e filtros */}
-      <section className="mt-8">
-        <TabelaCedente
-          tipo="fundo"
-          titulo="Carteira de Recebíveis sob Gestão"
-          subtitulo="Visão Executiva do Fundo"
-        />
-      </section>
+      {abaAtiva === 'recebiveis' && (
+        <section className="mt-4">
+          <TabelaCedente
+            tipo="fundo"
+            titulo="Carteira de Recebíveis sob Gestão"
+            subtitulo="Visão Executiva do Fundo"
+          />
+        </section>
+      )}
     </div>
   )
 }

@@ -21,7 +21,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import LoteImportacao, PerfilUsuario, Recebivel, SituacaoCadastralCNPJ
+from core.models import Cedente, Fundo, LoteImportacao, PerfilUsuario, Recebivel, SituacaoCadastralCNPJ
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.services import ImportadorCSVService
 from core.utils import gerar_hash_recebivel, raiz_cnpj, somente_digitos
@@ -158,7 +158,7 @@ class ImportadorCSVServiceTests(TestCase):
         service.motor = MotorDeRegras(service.config_regras)
 
         f1 = io.StringIO(csv_conteudo_1)
-        lote1, log1 = service.processar_arquivo(f1, "lote1.csv")
+        lote1, log1, _ = service.processar_arquivo(f1, "lote1.csv")
 
         # Primeiro envio: barrado por TIPO_RECEBIVEL (Cheque)
         self.assertEqual(Recebivel.objects.count(), 1)
@@ -173,7 +173,7 @@ class ImportadorCSVServiceTests(TestCase):
             "ANTECIPE FIDC;92.234.400/0001-80;EMPRESA A;10.062.050/0001-57;CLIENTE B;22.144.961/0001-02;DOC-1;Duplicata;500,00;20/11/2026;10/10/2026\n"
         )
         f2 = io.StringIO(csv_conteudo_2)
-        lote2, log2 = service.processar_arquivo(f2, "lote2.csv")
+        lote2, log2, _ = service.processar_arquivo(f2, "lote2.csv")
 
         # Não deve criar nova linha, deve atualizar a existente
         self.assertEqual(Recebivel.objects.count(), 1)
@@ -184,7 +184,7 @@ class ImportadorCSVServiceTests(TestCase):
         # Terceiro envio: tentativa de enviar novamente uma nota já APROVADA
         # Deve impedir a submissão (duplicata de aprovada)
         f3 = io.StringIO(csv_conteudo_2)
-        lote3, log3 = service.processar_arquivo(f3, "lote3.csv")
+        lote3, log3, _ = service.processar_arquivo(f3, "lote3.csv")
         self.assertEqual(Recebivel.objects.count(), 1)
         self.assertEqual(lote3.total_barrados, 1)
 
@@ -275,7 +275,7 @@ class RecebivelAPITests(TestCase):
         )
         service = ImportadorCSVService()
         f = io.StringIO(csv_data)
-        lote, _ = service.processar_arquivo(f, "populacao_test.csv")
+        lote, _, _ = service.processar_arquivo(f, "populacao_test.csv")
 
         # Verifica se as contas foram criadas com senha '123456'
         u_fundo = User.objects.filter(username="Fundo Alfa FIDC").first()
@@ -327,6 +327,31 @@ class RecebivelAPITests(TestCase):
         docs = [item['nu_documento'] for item in res_ced_atualizado.json()['results']]
         self.assertIn("DOC-POP-01", docs)
         self.assertIn("DOC-POP-02", docs)
+
+    def test_upload_csv_filtra_cnpj_cedente_e_ignora_estranhos(self):
+        """Testa que upload interno para usuário Cedente ignora registros com outro CNPJ de cedente."""
+        user_emp = User.objects.create_user(username="cedente_cnpj_test", password="password123")
+        PerfilUsuario.objects.create(usuario=user_emp, role=PerfilUsuario.Role.EMPRESA)
+        Cedente.objects.create(usuario=user_emp, nome="Cedente CNPJ Test", codigo="11.222.333/0001-44")
+
+        csv_mix = (
+            "NOME_FUNDO;DOC_FUNDO;NOME_CEDENTE;DOC_CEDENTE;NOME_SACADO;DOC_SACADO;NU_DOCUMENTO;TIPO_RECEBIVEL;VALOR_NOMINAL;DATA_VENCIMENTO_ORIGINAL;DATA_AQUISICAO\n"
+            "Fundo A;00.000.000/0001-91;Cedente CNPJ Test;11.222.333/0001-44;Sacado 1;22.144.961/0001-02;DOC-MATCH-1;Duplicata;1500,00;20/11/2026;10/10/2026\n"
+            "Fundo A;00.000.000/0001-91;Outro Cedente;99.999.999/0001-99;Sacado 2;22.144.961/0001-02;DOC-OUTRO-1;Duplicata;2500,00;20/11/2026;10/10/2026\n"
+            "Fundo A;00.000.000/0001-91;Cedente CNPJ Test;11.222.333/0001-44;Sacado 3;22.144.961/0001-02;DOC-MATCH-2;Duplicata;3500,00;20/11/2026;10/10/2026\n"
+        )
+        arquivo_mix = io.BytesIO(csv_mix.encode('utf-8'))
+        arquivo_mix.name = "mix.csv"
+
+        self.client.force_authenticate(user=user_emp)
+        res = self.client.post('/api/upload-csv/', {'file': arquivo_mix}, format='multipart')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        data = res.json()
+        self.assertEqual(data['total_ignorados'], 1)
+        self.assertEqual(data['lote']['total_linhas'], 2)
+        # O banco só deve conter os 2 recebíveis que coincidiram com o CNPJ do cedente
+        self.assertEqual(Recebivel.objects.filter(doc_cedente="11.222.333/0001-44").count(), 2)
+        self.assertFalse(Recebivel.objects.filter(nu_documento="DOC-OUTRO-1").exists())
 
 
 

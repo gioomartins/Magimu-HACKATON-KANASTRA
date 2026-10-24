@@ -1,0 +1,18 @@
+[
+  {
+    "linha": 2,
+    "id": "DOC-MATCH-1",
+    "status": "BARRADO",
+    "barrado_por": [
+      "CONCENTRACAO_MAXIMA_SACADO"
+    ]
+  },
+  {
+    "linha": 4,
+    "id": "DOC-MATCH-2",
+    "status": "BARRADO",
+    "barrado_por": [
+      "CONCENTRACAO_MAXIMA_SACADO"
+    ]
+  }
+]

@@ -14,7 +14,9 @@ export interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null
   token: string | null
+  isDemo: boolean
   login: (token: string, user: AuthUser) => void
+  loginDemo: (user: AuthUser) => void
   logout: () => void
   isLoading: boolean
 }
@@ -22,7 +24,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
+  isDemo: false,
   login: () => {},
+  loginDemo: () => {},
   logout: () => {},
   isLoading: true,
 })
@@ -33,6 +37,7 @@ const USER_KEY = 'antecipe_auth_user'
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const [isDemo, setIsDemo] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -51,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = (newToken: string, newUser: AuthUser) => {
+    setIsDemo(false)
     setToken(newToken)
     setUser(newUser)
     try {
@@ -61,7 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Login de Demonstração em memória: sem persistência em localStorage ou cookies
+  const loginDemo = (demoUser: AuthUser) => {
+    setIsDemo(true)
+    setToken('demo-token-in-memory')
+    setUser(demoUser)
+  }
+
   const logout = () => {
+    setIsDemo(false)
     setToken(null)
     setUser(null)
     try {
@@ -76,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, isDemo, login, loginDemo, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   )
