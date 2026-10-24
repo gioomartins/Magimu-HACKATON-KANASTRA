@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Antecipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Arial', 'sans-serif'] } } } };
+</script>
+<style>
+  :root { --bg: #0B2C20; --card: #F8F6F1; --ink: #292524; box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0B2C20; --card: #F8F6F1; --ink: #292524; } }
+  :root[data-theme="dark"] { --bg: #0B2C20; --card: #F8F6F1; --ink: #292524; }
+  body { background: var(--bg); font-family: 'Inter', ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif; }
+  .bar-fill { transition: width .25s linear; }
+  .chev { transition: transform .2s ease; }
+  [aria-expanded="true"] .chev { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .bar-fill, .chev { transition: none; } }
+  button:focus-visible, label:focus-within, input:focus-visible, select:focus-visible { outline: 2px solid #059669; outline-offset: 2px; }
+  #drop:focus-within { outline-color: #34d399; }
+  .fld { width: 100%; border-radius: .5rem; border: 1px solid rgb(231 229 228); background: rgba(255,255,255,.7); padding: .5rem .75rem; font-size: .875rem; color: #292524; }
+</style>
+</head>
+<body class="text-stone-800 antialiased">
+<main class="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6">
+
+  <header class="mb-8">
+    <h1 class="text-4xl font-semibold tracking-tight text-[#F8F6F1]">Antecipe</h1>
+    <p class="mt-1 text-sm text-emerald-100/70">Importar. Decidir. Explicar. Simular.</p>
+
+    <label id="drop" class="mt-6 flex cursor-pointer flex-col gap-4 rounded-xl border border-dashed border-emerald-200/30 bg-emerald-900/30 p-5 transition-colors hover:border-emerald-300/60 sm:flex-row sm:items-center sm:justify-between">
+      <input id="file" type="file" accept=".csv,text/csv" class="sr-only">
+      <div class="flex items-center gap-4">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100/10 text-emerald-200">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        </span>
+        <div>
+          <p class="text-sm font-medium text-[#F8F6F1]">Arraste o arquivo aqui ou selecione do computador</p>
+          <p class="text-xs text-emerald-100/60">Formato CSV, com milhares de notas por lote.</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center justify-center rounded-lg bg-[#F8F6F1] px-4 py-2.5 text-sm font-semibold text-emerald-950">Fazer upload do lote de notas (CSV)</span>
+    </label>
+
+    <div class="mt-4">
+      <div class="flex items-center justify-between text-xs text-emerald-100/80">
+        <span id="fname" class="truncate font-medium">lote_notas_outubro.csv</span>
+        <span id="fstate" class="shrink-0 pl-3">Processado · 100.000 notas lidas</span>
+      </div>
+      <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-emerald-900" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" id="pbar">
+        <div id="pfill" class="bar-fill h-full rounded-full bg-emerald-400" style="width:100%"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+
+    <!-- Filtros -->
+    <aside class="self-start rounded-xl bg-[#F8F6F1] p-5 lg:sticky lg:top-4" aria-label="Filtros">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-stone-800">Filtros</h2>
+        <button type="button" id="clear" class="rounded-md px-2 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-100">Limpar filtros</button>
+      </div>
+
+      <div class="mt-5 border-b border-stone-200/60 pb-5">
+        <p class="mb-2 text-xs font-bold uppercase tracking-wider text-stone-500">Status</p>
+        <div id="fstatus" class="flex flex-col gap-1.5"></div>
+      </div>
+
+      <div class="border-b border-stone-200/60 py-5">
+        <label for="fq" class="mb-2 block text-xs font-bold uppercase tracking-wider text-stone-500">Sacado ou nota</label>
+        <input id="fq" type="search" placeholder="Ex.: Mercado Sol ou 0157" class="fld">
+      </div>
+
+      <div class="border-b border-stone-200/60 py-5">
+        <label for="fprazo" class="mb-2 block text-xs font-bold uppercase tracking-wider text-stone-500">Vencimento</label>
+        <select id="fprazo" class="fld">
+          <option value="">Todos os prazos</option>
+          <option value="le30">Até 30 dias</option>
+          <option value="le60">Até 60 dias</option>
+          <option value="gt60">Mais de 60 dias</option>
+        </select>
+      </div>
+
+      <div class="border-b border-stone-200/60 py-5">
+        <p class="mb-2 text-xs font-bold uppercase tracking-wider text-stone-500">Valor (R$)</p>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="fmin" type="number" min="0" inputmode="numeric" placeholder="Mínimo" aria-label="Valor mínimo" class="fld">
+          <input id="fmax" type="number" min="0" inputmode="numeric" placeholder="Máximo" aria-label="Valor máximo" class="fld">
+        </div>
+      </div>
+
+      <div class="pt-5">
+        <label for="fmot" class="mb-2 block text-xs font-bold uppercase tracking-wider text-stone-500">Motivo da recusa</label>
+        <select id="fmot" class="fld">
+          <option value="">Todos os motivos</option>
+          <option>Prazo acima do limite</option>
+          <option>Concentração acima do limite</option>
+          <option>Valor acima do limite</option>
+        </select>
+      </div>
+    </aside>
+
+    <!-- Card principal -->
+    <section class="min-w-0 rounded-xl bg-[#F8F6F1]">
+      <div class="p-5 sm:p-8">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="rounded-xl border border-stone-200/60 bg-white/60 p-5">
+            <p class="text-xs font-bold uppercase tracking-wider text-stone-500">Total de notas</p>
+            <p class="mt-3 text-3xl font-medium text-stone-800">100.000</p>
+            <p class="mt-1 text-xs text-stone-500">notas lidas no lote</p>
+          </div>
+          <div class="rounded-xl border border-stone-200/60 bg-white/60 p-5">
+            <p class="text-xs font-bold uppercase tracking-wider text-stone-500">Valor aprovado (líquido)</p>
+            <p class="mt-3 text-3xl font-medium text-emerald-600">R$ 850.000,00</p>
+            <p class="mt-1 text-xs text-stone-500">já com a taxa descontada</p>
+          </div>
+          <div class="rounded-xl border border-stone-200/60 bg-white/60 p-5">
+            <p class="text-xs font-bold uppercase tracking-wider text-stone-500">Valor recusado</p>
+            <p class="mt-3 text-3xl font-medium text-rose-500">R$ 150.000,00</p>
+            <p class="mt-1 text-xs text-stone-500">fora das regras do fundo</p>
+          </div>
+        </div>
+
+        <div class="mt-10 flex flex-wrap items-end justify-between gap-2">
+          <h2 class="text-lg font-semibold text-stone-800">Resultado por nota</h2>
+          <p class="text-xs text-stone-500" id="count" aria-live="polite"></p>
+        </div>
+
+        <div class="mt-3 overflow-x-auto">
+          <table class="w-full min-w-[640px] border-collapse text-left text-sm">
+            <thead><tr class="border-b border-stone-200/60" id="thead"></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <nav id="pager" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200/60 pt-4" aria-label="Paginação"></nav>
+      </div>
+
+      <div class="sticky bottom-0 z-10 flex flex-col gap-1 rounded-b-xl bg-[#0B2C20] px-5 py-5 text-[#F8F6F1] shadow-[0_-8px_24px_rgba(11,44,32,.25)] sm:flex-row sm:items-center sm:justify-between sm:px-8" style="padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));">
+        <div>
+          <p class="text-sm font-medium">Simulação Final - NF’s Aprovadas</p>
+          <p class="text-xs text-emerald-100/60" id="simnote"></p>
+        </div>
+        <p class="text-sm text-emerald-100/80">Valor Líquido a Receber: <span id="liquido" class="ml-1 text-2xl font-semibold text-[#F8F6F1]"></span></p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  var TAXA = 0.02, PER = 8;
+  var brl = function (n) { return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- dados de exemplo (determinísticos) ----
+  var seed = 7;
+  function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  var sacados = ['Loja Aurora', 'Mercado Sol', 'Padaria Central', 'Casa do Norte', 'Armazém Bela Vista', 'Farmácia Vida', 'Rede Horizonte', 'Papelaria Ipê', 'Distribuidora Lima', 'Supermercado Trevo', 'Moda & Cia', 'Atacado Serra'];
+  var prazos = [15, 30, 30, 45, 45, 60, 60, 75, 90, 120];
+  var fixed = { '0142': ['Loja Aurora', 30, 10000], '0157': ['Mercado Sol', 90, 4500], '0163': ['Padaria Central', 45, 7200] };
+  function judge(r) {
+    if (r.prazo > 60) return { t: 'Prazo acima do limite', m: 'vence em ' + r.prazo + ' dias; o limite configurado do fundo é 60 dias.' };
+    if (r.sacado === 'Padaria Central') return { t: 'Concentração acima do limite', m: 'este sacado passaria a ser 14% da carteira; o máximo permitido pelo fundo é 10%.' };
+    if (r.valor > 25000) return { t: 'Valor acima do limite', m: 'a nota tem ' + brl(r.valor) + '; o máximo por nota configurado é R$ 25.000,00.' };
+    return null;
+  }
+  var all = [];
+  for (var n = 120; n < 168; n++) {
+    var nf = String(n).padStart(4, '0'), f = fixed[nf];
+    var r = f ? { sacado: f[0], prazo: f[1], valor: f[2] }
+              : { sacado: sacados[Math.floor(rnd() * sacados.length)], prazo: prazos[Math.floor(rnd() * prazos.length)], valor: Math.round((1500 + rnd() * 26500) / 10) * 10 };
+    r.nf = nf; r.why = judge(r); r.ok = !r.why; all.push(r);
+  }
+  var openSet = { '0157': true };
+
+  // ---- estado ----
+  var sort = { key: 'nf', dir: 1 }, page = 1;
+  var F = { status: 'all', q: '', prazo: '', min: '', max: '', mot: '' };
+  var cols = [
+    { key: 'nf', label: 'Nota', type: 'str', align: 'left' },
+    { key: 'sacado', label: 'Sacado', type: 'str', align: 'left' },
+    { key: 'prazo', label: 'Vencimento', type: 'num', align: 'left' },
+    { key: 'valor', label: 'Valor', type: 'num', align: 'right' },
+    { key: 'ok', label: 'Status', type: 'str', align: 'left' }
+  ];
+  var icons = {
+    none: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
+    asc: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+    desc: '<path d="M12 5v14M19 12l-7 7-7-7"/>'
+  };
+  var alertIcon = '<svg class="mt-0.5 shrink-0 text-rose-500" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+  var chev = '<svg class="chev text-stone-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  function badge(ok) {
+    return ok
+      ? '<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-600"><span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>Aprovada</span>'
+      : '<span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-500"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>Recusada</span>';
+  }
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+  function filtered() {
+    var q = norm(F.q.trim()), min = F.min === '' ? null : +F.min, max = F.max === '' ? null : +F.max;
+    var out = all.filter(function (r) {
+      if (F.status === 'ok' && !r.ok) return false;
+      if (F.status === 'no' && r.ok) return false;
+      if (q && norm(r.sacado + ' ' + r.nf).indexOf(q) < 0) return false;
+      if (F.prazo === 'le30' && r.prazo > 30) return false;
+      if (F.prazo === 'le60' && r.prazo > 60) return false;
+      if (F.prazo === 'gt60' && r.prazo <= 60) return false;
+      if (min !== null && r.valor < min) return false;
+      if (max !== null && r.valor > max) return false;
+      if (F.mot && (!r.why || r.why.t !== F.mot)) return false;
+      return true;
+    });
+    var k = sort.key;
+    out.sort(function (a, b) {
+      var x = a[k], y = b[k], c;
+      if (k === 'ok') c = (y ? 1 : 0) - (x ? 1 : 0);
+      else if (typeof x === 'number') c = x - y;
+      else c = x.localeCompare(y, 'pt-BR');
+      return (c || a.nf.localeCompare(b.nf)) * sort.dir;
+    });
+    return out;
+  }
+
+  function renderHead() {
+    $('thead').innerHTML = cols.map(function (c) {
+      var on = sort.key === c.key, st = on ? (sort.dir === 1 ? 'asc' : 'desc') : 'none';
+      var hint = c.type === 'num' ? 'crescente ou decrescente' : 'ordem alfabética';
+      var pad = c.key === 'valor' ? 'py-3 pr-4' : c.key === 'ok' ? 'py-3 pl-4' : 'py-3 pr-4';
+      return '<th scope="col" aria-sort="' + (on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') + '" class="' + pad + (c.align === 'right' ? ' text-right' : '') + '">' +
+        '<button type="button" data-k="' + c.key + '" title="Ordenar por ' + c.label.toLowerCase() + ' (' + hint + ')" class="sortbtn -mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-bold uppercase tracking-wider ' + (on ? 'text-stone-800' : 'text-stone-500') + ' hover:bg-stone-200/60">' +
+        c.label + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="' + (on ? 'text-emerald-600' : 'opacity-50') + '" aria-hidden="true">' + icons[st] + '</svg></button></th>';
+    }).join('');
+  }
+
+  function renderStatus() {
+    var cnt = { all: all.length, ok: all.filter(function (r) { return r.ok; }).length };
+    cnt.no = cnt.all - cnt.ok;
+    $('fstatus').innerHTML = [['all', 'Todas'], ['ok', 'Aprovadas'], ['no', 'Recusadas']].map(function (o) {
+      var on = F.status === o[0];
+      return '<button type="button" data-s="' + o[0] + '" aria-pressed="' + on + '" class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium ' +
+        (on ? 'border-emerald-600/40 bg-emerald-100 text-emerald-600' : 'border-stone-200/60 bg-white/60 text-stone-800 hover:bg-white') + '">' + o[1] +
+        '<span class="text-xs tabular-nums ' + (on ? 'text-emerald-600' : 'text-stone-500') + '">' + cnt[o[0]] + '</span></button>';
+    }).join('');
+  }
+
+  function renderRows(list) {
+    if (!list.length) {
+      $('rows').innerHTML = '<tr><td colspan="5" class="py-14 text-center"><p class="text-sm font-medium text-stone-800">Nenhuma nota encontrada com esses filtros.</p><button type="button" class="doclear mt-3 rounded-lg bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-600">Limpar filtros</button></td></tr>';
+      return;
+    }
+    var html = '';
+    list.forEach(function (r, i) {
+      var open = !r.ok && openSet[r.nf], last = i === list.length - 1;
+      html += '<tr class="' + (open || last ? '' : 'border-b border-stone-200/60') + '">' +
+        '<td class="py-4 pr-4 font-medium text-stone-800">NF ' + r.nf + '</td>' +
+        '<td class="py-4 pr-4 font-medium text-stone-800">' + r.sacado + '</td>' +
+        '<td class="py-4 pr-4 font-medium text-stone-800">' + r.prazo + ' dias</td>' +
+        '<td class="py-4 pr-4 text-right font-medium tabular-nums text-stone-800">' + brl(r.valor) + '</td>' +
+        '<td class="py-4 pl-4"><div class="flex items-center gap-3">' + badge(r.ok) +
+        (r.ok ? '' : '<button type="button" data-nf="' + r.nf + '" aria-expanded="' + !!open + '" aria-label="Ver motivo da recusa da NF ' + r.nf + '" class="toggle rounded-md p-1 hover:bg-stone-200/60">' + chev + '</button>') +
+        '</div></td></tr>';
+      if (open) {
+        html += '<tr class="' + (last ? '' : 'border-b border-stone-200/60') + '"><td colspan="5" class="pb-4"><div class="flex gap-3 rounded-lg bg-rose-50 px-4 py-3.5 text-sm text-stone-700" role="note">' + alertIcon +
+          '<p class="leading-relaxed"><span class="font-semibold text-rose-500">' + r.why.t + ':</span> ' + r.why.m + '</p></div></td></tr>';
+      }
+    });
+    $('rows').innerHTML = html;
+  }
+
+  function pageList(cur, total) {
+    var set = [1, total, cur - 1, cur, cur + 1].filter(function (p) { return p >= 1 && p <= total; });
+    set = set.filter(function (p, i) { return set.indexOf(p) === i; }).sort(function (a, b) { return a - b; });
+    var out = [];
+    set.forEach(function (p, i) { if (i && p - set[i - 1] > 1) out.push('…'); out.push(p); });
+    return out;
+  }
+  function renderPager(total) {
+    var pages = Math.max(1, Math.ceil(total / PER));
+    if (page > pages) page = pages;
+    var from = total ? (page - 1) * PER + 1 : 0, to = Math.min(total, page * PER);
+    var base = 'min-w-[2.25rem] rounded-lg px-2.5 py-2 text-sm font-medium ';
+    var btns = pageList(page, pages).map(function (p) {
+      if (p === '…') return '<span class="px-1 text-stone-500" aria-hidden="true">…</span>';
+      var cur = p === page;
+      return '<button type="button" data-p="' + p + '"' + (cur ? ' aria-current="page"' : '') + ' aria-label="Página ' + p + '" class="' + base + (cur ? 'bg-[#0B2C20] text-[#F8F6F1]' : 'text-stone-800 hover:bg-stone-200/60') + '">' + p + '</button>';
+    }).join('');
+    var nav = function (lbl, target, dis, txt) {
+      return '<button type="button" data-p="' + target + '" aria-label="' + lbl + '"' + (dis ? ' disabled' : '') + ' class="' + base + 'border border-stone-200/60 bg-white/60 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/60">' + txt + '</button>';
+    };
+    $('pager').innerHTML = '<p class="text-xs text-stone-500">Mostrando ' + from + '–' + to + ' de ' + total + '</p>' +
+      '<div class="flex items-center gap-1">' + nav('Página anterior', page - 1, page === 1, 'Anterior') + btns + nav('Próxima página', page + 1, page === pages, 'Próxima') + '</div>';
+  }
+
+  function render() {
+    var list = filtered(), total = list.length;
+    var pages = Math.max(1, Math.ceil(total / PER)); if (page > pages) page = pages;
+    var sum = list.reduce(function (s, r) { return s + r.valor; }, 0);
+    $('count').textContent = total + (total === 1 ? ' nota' : ' notas') + ' na seleção · ' + brl(sum) + ' · amostra de 100.000';
+    renderHead(); renderStatus();
+    renderRows(list.slice((page - 1) * PER, page * PER));
+    renderPager(total);
+    var ap = list.filter(function (r) { return r.ok; }), aprov = ap.reduce(function (s, r) { return s + r.valor; }, 0);
+    $('liquido').textContent = brl(aprov * (1 - TAXA));
+    $('simnote').textContent = ap.length + (ap.length === 1 ? ' nota aprovada' : ' notas aprovadas') + ' na seleção · taxa de ' + (TAXA * 100).toFixed(2).replace('.', ',') + '% já descontada de ' + brl(aprov);
+  }
+
+  // ---- eventos ----
+  $('thead').addEventListener('click', function (e) {
+    var b = e.target.closest('.sortbtn'); if (!b) return;
+    var k = b.dataset.k;
+    if (sort.key === k) sort.dir *= -1; else { sort.key = k; sort.dir = 1; }
+    page = 1; render();
+    var again = document.querySelector('.sortbtn[data-k="' + k + '"]'); if (again) again.focus();
+  });
+  $('rows').addEventListener('click', function (e) {
+    if (e.target.closest('.doclear')) return clearAll();
+    var b = e.target.closest('.toggle'); if (!b) return;
+    var nf = b.dataset.nf; openSet[nf] = !openSet[nf]; render();
+    var again = document.querySelector('.toggle[data-nf="' + nf + '"]'); if (again) again.focus();
+  });
+  $('pager').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-p]'); if (!b || b.disabled) return;
+    page = +b.dataset.p; render();
+    var again = document.querySelector('#pager [aria-current="page"]'); if (again) again.focus();
+  });
+  $('fstatus').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-s]'); if (!b) return;
+    F.status = b.dataset.s; page = 1; render();
+    var again = document.querySelector('#fstatus [data-s="' + F.status + '"]'); if (again) again.focus();
+  });
+  [['fq', 'q'], ['fprazo', 'prazo'], ['fmin', 'min'], ['fmax', 'max'], ['fmot', 'mot']].forEach(function (p) {
+    $(p[0]).addEventListener('input', function () { F[p[1]] = this.value; page = 1; render(); });
+  });
+  function clearAll() {
+    F = { status: 'all', q: '', prazo: '', min: '', max: '', mot: '' };
+    ['fq', 'fprazo', 'fmin', 'fmax', 'fmot'].forEach(function (id) { $(id).value = ''; });
+    page = 1; render();
+  }
+  $('clear').addEventListener('click', clearAll);
+  render();
+
+  // ---- upload simulado ----
+  var input = $('file'), drop = $('drop'), timer;
+  function process(file) {
+    clearInterval(timer);
+    $('fname').textContent = file.name;
+    var p = 0; $('pfill').style.width = '0%';
+    timer = setInterval(function () {
+      p = Math.min(100, p + 4 + Math.random() * 7);
+      $('pfill').style.width = p + '%'; $('pbar').setAttribute('aria-valuenow', Math.round(p));
+      if (p >= 100) { clearInterval(timer); $('fstate').textContent = 'Processado · 100.000 notas lidas'; }
+      else $('fstate').textContent = 'Aplicando regras do fundo… ' + Math.round(p) + '%';
+    }, 120);
+  }
+  input.addEventListener('change', function () { if (input.files[0]) process(input.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('border-emerald-300/70'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('border-emerald-300/70'); }); });
+  drop.addEventListener('drop', function (e) { if (e.dataTransfer.files[0]) process(e.dataTransfer.files[0]); });
+})();
+</script>
+</body>
+</html>
