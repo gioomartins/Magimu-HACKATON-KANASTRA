@@ -1,4 +1,16 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+// Normaliza a URL base da API garantindo que o prefixo '/api' esteja sempre presente
+// independentemente de como a variável NEXT_PUBLIC_API_URL for configurada no Vercel.
+function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  const rawUrl = (envUrl && envUrl.trim().length > 0)
+    ? envUrl.trim()
+    : 'http://localhost:8000/api';
+
+  const cleanUrl = rawUrl.replace(/\/+$/, '');
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+}
+
+const API_BASE = getApiBaseUrl();
 
 export interface RecebivelItem {
   id: number;
