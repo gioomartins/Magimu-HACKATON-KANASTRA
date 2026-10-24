@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
@@ -232,3 +233,37 @@ class SituacaoCadastralCNPJ(models.Model):
 
     def __str__(self) -> str:
         return f'{self.cnpj_formatado} - {self.situacao}'
+
+
+class PerfilUsuario(models.Model):
+    """
+    Perfil estendido para controle de acesso RBAC no Antecipe.
+    - GESTOR: Acesso irrestrito (upload, dashboard, leitura e escrita de regras FIDC).
+    - EMPRESA: Acesso operacional (upload de notas e visualização da carteira do cedente).
+    """
+
+    class Role(models.TextChoices):
+        GESTOR = 'GESTOR', 'Gestor do Fundo'
+        EMPRESA = 'EMPRESA', 'Empresa Cedente'
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='perfil',
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.EMPRESA,
+        db_index=True,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'antecipe_perfil_usuario'
+        verbose_name = 'perfil de usuário'
+        verbose_name_plural = 'perfis de usuários'
+
+    def __str__(self) -> str:
+        return f'{self.usuario.username} ({self.role})'
+

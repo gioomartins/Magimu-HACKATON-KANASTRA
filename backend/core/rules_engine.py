@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.utils import raiz_cnpj, somente_digitos
 
@@ -28,7 +28,7 @@ from core.utils import raiz_cnpj, somente_digitos
 class ContextoValidacao:
     """
     Contexto contendo métricas agregadas da carteira/lote para validação de concentração
-    e base em cache para situações cadastrais.
+    e base em cache para situações cadastrais e duplicidade.
     """
 
     def __init__(
@@ -38,6 +38,7 @@ class ContextoValidacao:
         totais_fundo: Optional[Dict[str, Decimal]] = None,
         totais_sacado_fundo: Optional[Dict[Tuple[str, str], Decimal]] = None,
         totais_cedente_fundo: Optional[Dict[Tuple[str, str], Decimal]] = None,
+        hashes_aprovados: Optional[Set[str]] = None,
     ):
         self.data_base = data_base
         self.situacoes_cnpj = situacoes_cnpj or {}
@@ -47,6 +48,8 @@ class ContextoValidacao:
         self.totais_sacado_fundo = totais_sacado_fundo or {}
         # chave: (doc_fundo, doc_cedente)
         self.totais_cedente_fundo = totais_cedente_fundo or {}
+        self.hashes_aprovados = hashes_aprovados or set()
+
 
 
 class ValidadorStrategy(ABC):
@@ -226,6 +229,20 @@ class ValidadorConcentracaoMaximaCedente(ValidadorStrategy):
         return None
 
 
+class ValidadorDuplicidade(ValidadorStrategy):
+    codigo = "DUPLICIDADE"
+
+    def validar(self, nota: Dict[str, Any], contexto: ContextoValidacao) -> Optional[Tuple[str, str]]:
+        hashes_existentes = getattr(contexto, 'hashes_aprovados', set())
+        hash_id = nota.get("hash_id")
+        if hash_id and hash_id in hashes_existentes:
+            return (
+                self.codigo,
+                f"Nota duplicada com hash_id '{hash_id}'. Já existe um recebível idêntico aprovado no fundo.",
+            )
+        return None
+
+
 REGISTRY_VALIDADORES = {
     "PRAZO_MAXIMO": ValidadorPrazoMaximo,
     "PRAZO_MINIMO": ValidadorPrazoMinimo,
@@ -236,6 +253,7 @@ REGISTRY_VALIDADORES = {
     "SITUACAO_CADASTRAL_SACADO": ValidadorSituacaoCadastralSacado,
     "CONCENTRACAO_MAXIMA_SACADO": ValidadorConcentracaoMaximaSacado,
     "CONCENTRACAO_MAXIMA_CEDENTE": ValidadorConcentracaoMaximaCedente,
+    "DUPLICIDADE": ValidadorDuplicidade,
 }
 
 

@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
     'DJANGO_SECRET_KEY',
-    'django-insecure-0kswf=7txohiq&l=if9(vjrau4i%%&sym(ol(0*c@o0tu3jc-(',
+    'django-insecure-antecipe-fidc-kanastra-hackathon-2026-super-secure-key-jwt-auth-64bytes!',
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     # Terceiros
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
     # Apps do projeto
     'core',
@@ -77,6 +78,15 @@ CORS_ALLOW_ALL_ORIGINS = True
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 ROOT_URLCONF = 'config.urls'

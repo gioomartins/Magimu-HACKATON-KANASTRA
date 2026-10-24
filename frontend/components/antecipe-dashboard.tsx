@@ -2,13 +2,19 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Building2, Layers, ShieldCheck, Wallet } from 'lucide-react'
+import { ArrowLeft, Building2, LogOut, ShieldAlert, User, Wallet } from 'lucide-react'
 import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
 import { ThemeToggle } from './theme-toggle'
+import { useAuth } from '@/lib/auth-context'
 
 export function AntecipeDashboard() {
+  const { user, logout } = useAuth()
   const [facetaAtiva, setFacetaAtiva] = useState<'cedente' | 'fundo'>('cedente')
+
+  // Se o usuário estiver autenticado como GESTOR, acesso total;
+  // Se for EMPRESA ou não autenticado, restrito a cedente.
+  const isGestor = user?.role === 'GESTOR'
 
   return (
     <main id="conteudo-principal" className="min-h-screen bg-[#f8f6f1] text-stone-900 transition-colors duration-200 dark:bg-[#0b2c20] dark:text-stone-100">
@@ -37,8 +43,8 @@ export function AntecipeDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Barra Nav de Transição entre as Duas Facetas */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Barra Nav de Transição entre as Duas Facetas (com restrição de UX para EMPRESA) */}
             <nav
               aria-label="Alternar facetas operacionais"
               className="inline-flex rounded-xl border border-emerald-800/20 bg-[#0b2c20] p-1.5 shadow-sm dark:border-emerald-200/20 dark:bg-[#103b2c]"
@@ -58,9 +64,15 @@ export function AntecipeDashboard() {
 
               <button
                 type="button"
-                onClick={() => setFacetaAtiva('fundo')}
+                onClick={() => {
+                  if (isGestor) setFacetaAtiva('fundo')
+                }}
+                disabled={!isGestor}
+                title={!isGestor ? 'Acesso restrito a Gestores do Fundo' : 'Configuração de Regras do Fundo'}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all ${
-                  facetaAtiva === 'fundo'
+                  !isGestor
+                    ? 'opacity-50 cursor-not-allowed text-emerald-100/40'
+                    : facetaAtiva === 'fundo'
                     ? 'bg-[#f8f6f1] text-[#0b2c20] shadow'
                     : 'text-emerald-100/70 hover:text-white'
                 }`}
@@ -70,10 +82,54 @@ export function AntecipeDashboard() {
               </button>
             </nav>
 
+            {/* Informações do Usuário Autenticado / Botão de Login */}
+            {user ? (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-800/20 bg-white/80 px-3 py-2 text-xs shadow-sm dark:border-emerald-400/20 dark:bg-[#103b2c]">
+                <span
+                  className={`size-2 rounded-full ${
+                    isGestor ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`}
+                />
+                <span className="font-bold text-stone-800 dark:text-emerald-100">
+                  {user.username}
+                </span>
+                <span className="rounded bg-emerald-950/15 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-300">
+                  {user.role}
+                </span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="ml-1 inline-flex items-center gap-1 text-[11px] font-semibold text-stone-500 hover:text-rose-600 dark:text-emerald-200/60 dark:hover:text-rose-300 transition"
+                  title="Sair da conta"
+                >
+                  <LogOut size={12} />
+                  <span>Sair</span>
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-emerald-800/20 bg-white px-4 text-xs font-bold text-stone-800 shadow-sm hover:bg-stone-50 dark:border-emerald-300/20 dark:bg-[#103b2c] dark:text-emerald-100 dark:hover:bg-[#154635] transition"
+              >
+                <User size={14} />
+                <span>Entrar</span>
+              </Link>
+            )}
+
             {/* Alternador de Tema Claro / Escuro */}
             <ThemeToggle />
           </div>
         </header>
+
+        {/* Alerta explicativo caso o usuário seja Empresa e tente ver regras */}
+        {user?.role === 'EMPRESA' && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+            <ShieldAlert size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              Você está conectado como <strong>Empresa Cedente</strong>. Seu acesso está habilitado para submissão de CSV e consulta de notas. A configuração de regras e parâmetros do FIDC é de acesso restrito a <strong>Gestores do Fundo</strong>.
+            </span>
+          </div>
+        )}
 
         {/* Conteúdo Dinâmico da Faceta Selecionada */}
         <div className="mt-4">

@@ -11,13 +11,14 @@ Endpoints:
 import json
 from pathlib import Path
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
 from django.conf import settings
 from core.models import LoteImportacao, Recebivel
+from core.permissions import IsGestor
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.serializers import LoteImportacaoSerializer, RecebivelSerializer
 from core.services import ImportadorCSVService
@@ -126,6 +127,7 @@ def upload_csv_view(request):
 
 
 @api_view(['GET', 'POST', 'PUT'])
+@permission_classes([IsGestor])
 def regras_vigentes_view(request):
     """
     GET: Retorna as regras vigentes e a taxa de precificação do arquivo validadores_antecipe.json.

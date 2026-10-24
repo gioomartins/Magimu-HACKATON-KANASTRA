@@ -14,13 +14,14 @@ from io import StringIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import LoteImportacao, Recebivel, SituacaoCadastralCNPJ
+from core.models import LoteImportacao, PerfilUsuario, Recebivel, SituacaoCadastralCNPJ
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.services import ImportadorCSVService
 from core.utils import gerar_hash_recebivel, raiz_cnpj, somente_digitos
@@ -267,6 +268,10 @@ class RecebivelAPITests(TestCase):
         self.assertEqual(res_get.json()['nu_documento'], 'NF-999')
 
     def test_regras_endpoint_get_e_post(self):
+        u_gestor = User.objects.create_user(username='gestor_test', password='pwd')
+        PerfilUsuario.objects.create(usuario=u_gestor, role=PerfilUsuario.Role.GESTOR)
+        self.client.force_authenticate(user=u_gestor)
+
         # Teste GET /api/regras/
         res_get = self.client.get('/api/regras/')
         self.assertEqual(res_get.status_code, status.HTTP_200_OK)
@@ -278,4 +283,5 @@ class RecebivelAPITests(TestCase):
         self.assertEqual(res_post.status_code, status.HTTP_200_OK)
         self.assertIn('mensagem', res_post.json())
         self.assertIn('total_reprecificadas', res_post.json())
+
 

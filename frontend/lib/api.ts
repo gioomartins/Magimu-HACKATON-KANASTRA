@@ -51,6 +51,50 @@ export interface FundoConfig {
   };
 }
 
+export interface AuthResponse {
+  token: string;
+  refresh: string;
+  username: string;
+  role: 'GESTOR' | 'EMPRESA';
+  mensagem?: string;
+}
+
+function getAuthHeader(): Record<string, string> {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('antecipe_auth_token');
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  }
+  return {};
+}
+
+export async function loginApi(username: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/login/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.erro || 'Falha ao realizar login');
+  }
+  return res.json();
+}
+
+export async function registerApi(username: string, password: string, role: 'GESTOR' | 'EMPRESA'): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/register/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.erro || 'Falha ao criar conta');
+  }
+  return res.json();
+}
+
 export async function fetchRecebiveis(params: {
   page?: number;
   status?: string;
@@ -63,21 +107,33 @@ export async function fetchRecebiveis(params: {
   if (params.status && params.status !== 'TODOS') query.set('status', params.status);
   if (params.nu_documento) query.set('nu_documento', params.nu_documento);
 
-  const res = await fetch(`${API_BASE}/recebiveis/?${query.toString()}`);
+  const res = await fetch(`${API_BASE}/recebiveis/?${query.toString()}`, {
+    headers: getAuthHeader(),
+  });
   if (!res.ok) throw new Error('Falha ao carregar recebíveis');
   return res.json();
 }
 
 export async function fetchRegras(): Promise<FundoConfig> {
-  const res = await fetch(`${API_BASE}/regras/`);
-  if (!res.ok) throw new Error('Falha ao obter regras do fundo');
+  const res = await fetch(`${API_BASE}/regras/`, {
+    headers: getAuthHeader(),
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Acesso restrito a Gestores do Fundo');
+    }
+    throw new Error('Falha ao obter regras do fundo');
+  }
   return res.json();
 }
 
 export async function updateRegras(config: FundoConfig): Promise<any> {
   const res = await fetch(`${API_BASE}/regras/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
     body: JSON.stringify(config),
   });
   if (!res.ok) {
@@ -92,6 +148,7 @@ export async function uploadCSV(file: File): Promise<any> {
   formData.append('file', file);
   const res = await fetch(`${API_BASE}/upload-csv/`, {
     method: 'POST',
+    headers: getAuthHeader(),
     body: formData,
   });
   if (!res.ok) {

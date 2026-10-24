@@ -6,8 +6,10 @@ import Image from 'next/image'
 import { useTheme } from 'next-themes'
 import { Menu, X, ArrowRight } from 'lucide-react'
 import { ThemeToggle } from '../theme-toggle'
+import { useAuth } from '@/lib/auth-context'
 
 export function Navbar() {
+  const { user } = useAuth()
   const [menuAberto, setMenuAberto] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const { resolvedTheme } = useTheme()
@@ -105,6 +107,24 @@ export function Navbar() {
         {/* Ações Desktop */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
+          {user ? (
+            <Link
+              href="/plataforma"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-800/20 bg-emerald-950/20 px-3.5 py-1.5 text-xs font-semibold text-stone-800 dark:border-emerald-300/20 dark:text-emerald-200"
+            >
+              <span className="size-2 rounded-full bg-emerald-400" />
+              <span>{user.username}</span>
+              <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-bold uppercase">{user.role}</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-stone-300/80 bg-white px-4 text-xs font-bold uppercase tracking-wider text-stone-700 hover:bg-stone-50 dark:border-emerald-500/20 dark:bg-[#103b2c] dark:text-emerald-200 dark:hover:bg-[#154635] transition"
+            >
+              Entrar
+            </Link>
+          )}
+
           <Link
             href="/plataforma"
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0b2c20] px-5 text-xs font-bold uppercase tracking-wider text-[#f8f6f1] shadow-sm transition-all hover:bg-[#103b2c] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 dark:bg-[#f8f6f1] dark:text-[#0b2c20] dark:hover:bg-white"
