@@ -265,3 +265,17 @@ class RecebivelAPITests(TestCase):
         res_get = self.client.get(f'/api/recebiveis/{rec_id}/')
         self.assertEqual(res_get.status_code, status.HTTP_200_OK)
         self.assertEqual(res_get.json()['nu_documento'], 'NF-999')
+
+    def test_regras_endpoint_get_e_post(self):
+        # Teste GET /api/regras/
+        res_get = self.client.get('/api/regras/')
+        self.assertEqual(res_get.status_code, status.HTTP_200_OK)
+        self.assertIn('validadores', res_get.json())
+
+        # Teste POST /api/regras/ atualizando configuração
+        regras_atuais = res_get.json()
+        res_post = self.client.post('/api/regras/', regras_atuais, format='json')
+        self.assertEqual(res_post.status_code, status.HTTP_200_OK)
+        self.assertIn('mensagem', res_post.json())
+        self.assertIn('total_reprecificadas', res_post.json())
+

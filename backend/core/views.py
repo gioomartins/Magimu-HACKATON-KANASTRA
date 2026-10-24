@@ -8,6 +8,7 @@ Endpoints:
 - GET /api/regras/ : Visualização das regras de negócio ativas e configuração de precificação.
 """
 
+import json
 from pathlib import Path
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes
@@ -17,6 +18,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from django.conf import settings
 from core.models import LoteImportacao, Recebivel
+from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.serializers import LoteImportacaoSerializer, RecebivelSerializer
 from core.services import ImportadorCSVService
 
@@ -83,18 +85,33 @@ def upload_csv_view(request):
     logs_dir.mkdir(exist_ok=True)
     caminho_log = logs_dir / f"log_processamento_{arquivo.name}.json"
 
+    # Salva o arquivo enviado em um arquivo temporário no disco para permitir
+    # múltiplas passadas (pré-cálculo e ingestão) sem problemas com ponteiro ou arquivo fechado
+    import tempfile
+    import shutil
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
+        for chunk in arquivo.chunks():
+            tmp.write(chunk)
+        temp_path = Path(tmp.name)
+
     service = ImportadorCSVService()
     try:
         lote, registros_log = service.processar_arquivo(
-            arquivo_ou_caminho=arquivo,
+            arquivo_ou_caminho=temp_path,
             nome_arquivo=arquivo.name,
             caminho_log=caminho_log,
         )
     except Exception as e:
+        if temp_path.exists():
+            temp_path.unlink()
         return Response(
             {'erro': f'Falha ao processar arquivo CSV: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
 
     # Retorna o resumo do lote e uma amostra dos primeiros registros do log
     return Response(
@@ -141,15 +158,15 @@ def regras_vigentes_view(request):
 
         # Totais para concentração considerando notas existentes
         from decimal import Decimal
-        from django.db.models import Sum
-        from core.utils import raiz_cnpj
+        from django.db import connection
 
         # Reavalia notas BARRADAS para ver se passam com as novas regras
-        notas_barradas = Recebivel.objects.filter(status=Recebivel.Status.BARRADO)
+        notas_barradas = Recebivel.objects.filter(status=Recebivel.Status.BARRADO).iterator(chunk_size=2000)
         recs_para_aprovar = []
+        total_novas_aprovadas = 0
         for r in notas_barradas:
             # Não desfaz duplicidade intralote genuína
-            if Recebivel.CODIGO_DUPLICIDADE in r.barrado_por:
+            if Recebivel.CODIGO_DUPLICIDADE in (r.barrado_por or []):
                 continue
 
             nota_dict = {
@@ -177,31 +194,63 @@ def regras_vigentes_view(request):
                 r.valor_liquido = liq
                 recs_para_aprovar.append(r)
 
+                if len(recs_para_aprovar) >= 2000:
+                    Recebivel.objects.bulk_update(
+                        recs_para_aprovar,
+                        fields=['status', 'barrado_por', 'motivo_recusa', 'prazo_dias', 'desconto', 'valor_liquido'],
+                        batch_size=2000,
+                    )
+                    total_novas_aprovadas += len(recs_para_aprovar)
+                    recs_para_aprovar = []
+
         if recs_para_aprovar:
             Recebivel.objects.bulk_update(
                 recs_para_aprovar,
-                fields=['status', 'barrado_por', 'motivo_recusa', 'prazo_dias', 'desconto', 'valor_liquido']
+                fields=['status', 'barrado_por', 'motivo_recusa', 'prazo_dias', 'desconto', 'valor_liquido'],
+                batch_size=2000,
             )
+            total_novas_aprovadas += len(recs_para_aprovar)
 
         # 2. Recalcula a precificação em tempo real de todas as notas APROVADAS
-        todas_aprovadas = Recebivel.objects.filter(status=Recebivel.Status.APROVADO)
-        recs_precificacao = []
-        for r in todas_aprovadas:
-            dias, desc, liq = service.motor.calcular_precificacao(
-                r.valor_nominal, r.data_vencimento_original, service.data_base
-            )
-            r.prazo_dias = dias
-            r.desconto = desc
-            r.valor_liquido = liq
-            recs_precificacao.append(r)
+        prec_cfg = novo_json.get("precificacao", {})
+        taxa_mensal = Decimal(str(prec_cfg.get("taxa_mensal_percentual", 2.0))) / Decimal(100)
+        base_dias = Decimal(str(prec_cfg.get("base_dias", 30)))
 
-        if recs_precificacao:
-            Recebivel.objects.bulk_update(recs_precificacao, fields=['prazo_dias', 'desconto', 'valor_liquido'])
+        if connection.vendor == 'postgresql':
+            table_name = connection.ops.quote_name(Recebivel._meta.db_table)
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    UPDATE {table_name}
+                    SET prazo_dias = GREATEST(data_vencimento_original - %s, 0),
+                        desconto = ROUND(valor_nominal * (%s * (GREATEST(data_vencimento_original - %s, 0)::numeric / %s)), 2),
+                        valor_liquido = valor_nominal - ROUND(valor_nominal * (%s * (GREATEST(data_vencimento_original - %s, 0)::numeric / %s)), 2)
+                    WHERE status = 'APROVADO';
+                """, [service.data_base, taxa_mensal, service.data_base, base_dias, taxa_mensal, service.data_base, base_dias])
+                total_reprecificadas = cursor.rowcount
+        else:
+            todas_aprovadas = Recebivel.objects.filter(status=Recebivel.Status.APROVADO).iterator(chunk_size=2000)
+            recs_precificacao = []
+            total_reprecificadas = 0
+            for r in todas_aprovadas:
+                dias, desc, liq = service.motor.calcular_precificacao(
+                    r.valor_nominal, r.data_vencimento_original, service.data_base
+                )
+                r.prazo_dias = dias
+                r.desconto = desc
+                r.valor_liquido = liq
+                recs_precificacao.append(r)
+                if len(recs_precificacao) >= 2000:
+                    Recebivel.objects.bulk_update(recs_precificacao, fields=['prazo_dias', 'desconto', 'valor_liquido'], batch_size=2000)
+                    total_reprecificadas += len(recs_precificacao)
+                    recs_precificacao = []
+            if recs_precificacao:
+                Recebivel.objects.bulk_update(recs_precificacao, fields=['prazo_dias', 'desconto', 'valor_liquido'], batch_size=2000)
+                total_reprecificadas += len(recs_precificacao)
 
         return Response({
             'mensagem': 'Configuração de regras e precificação atualizada com sucesso!',
-            'novas_aprovadas': len(recs_para_aprovar),
-            'total_reprecificadas': len(recs_precificacao),
+            'novas_aprovadas': total_novas_aprovadas,
+            'total_reprecificadas': total_reprecificadas,
             'regras': novo_json,
         })
 

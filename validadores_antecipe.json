@@ -32,7 +32,7 @@
       "codigo": "VALOR_MINIMO",
       "ativo": true,
       "parametros": {
-        "valor_minimo": 100.0
+        "valor_minimo": 50
       }
     },
     {
@@ -51,7 +51,7 @@
       "codigo": "CONCENTRACAO_MAXIMA_SACADO",
       "ativo": true,
       "parametros": {
-        "percentual_maximo": 10.0,
+        "percentual_maximo": 10,
         "agrupamento": "RAIZ_CNPJ"
       }
     },
@@ -66,13 +66,13 @@
       "codigo": "CONCENTRACAO_MAXIMA_CEDENTE",
       "ativo": false,
       "parametros": {
-        "percentual_maximo": 8.0
+        "percentual_maximo": 8
       }
     }
   ],
   "precificacao": {
     "metodo": "DESCONTO_SIMPLES",
-    "taxa_mensal_percentual": 2.0,
+    "taxa_mensal_percentual": 2,
     "base_dias": 30
   }
 }

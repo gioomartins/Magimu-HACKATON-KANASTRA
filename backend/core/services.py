@@ -102,13 +102,18 @@ class ImportadorCSVService:
             f = open(arquivo_ou_caminho, encoding="utf-8-sig", newline="")
             return csv.DictReader(f, delimiter=";")
         elif hasattr(arquivo_ou_caminho, "read"):
-            # Objeto de arquivo em memória (ex: InMemoryUploadedFile)
             if hasattr(arquivo_ou_caminho, "seek"):
-                arquivo_ou_caminho.seek(0)
-            if isinstance(arquivo_ou_caminho.read(0), bytes):
-                texto = io.TextIOWrapper(arquivo_ou_caminho, encoding="utf-8-sig")
-                return csv.DictReader(texto, delimiter=";")
-            return csv.DictReader(arquivo_ou_caminho, delimiter=";")
+                try:
+                    arquivo_ou_caminho.seek(0)
+                except Exception:
+                    pass
+            # Se já for texto (como StringIO)
+            primeira_amostra = arquivo_ou_caminho.read(0)
+            if isinstance(primeira_amostra, str):
+                return csv.DictReader(arquivo_ou_caminho, delimiter=";")
+            # Se for bytes
+            texto = io.TextIOWrapper(arquivo_ou_caminho, encoding="utf-8-sig")
+            return csv.DictReader(texto, delimiter=";")
         raise ValueError("Tipo de arquivo não suportado para leitura CSV.")
 
     def processar_arquivo(
