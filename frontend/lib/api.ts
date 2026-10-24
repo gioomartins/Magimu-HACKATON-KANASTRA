@@ -157,3 +157,39 @@ export async function uploadCSV(file: File): Promise<any> {
   }
   return res.json();
 }
+
+export interface AnalyticsData {
+  kpis: {
+    volume_total_aprovado: number;
+    volume_total_recusado: number;
+    quantidade_total_processada: number;
+    quantidade_aprovadas: number;
+    quantidade_recusadas: number;
+  };
+  taxa_rejeicao: {
+    percentual_rejeicao: number;
+    percentual_aprovacao: number;
+  };
+  motivos_recusa: Array<{ motivo: string; total: number }>;
+  risco_concentracao: Array<{
+    doc_sacado: string;
+    nome_sacado: string;
+    volume: number;
+    quantidade: number;
+    percentual_exposicao: number;
+  }>;
+}
+
+export async function fetchAnalyticsDashboard(): Promise<AnalyticsData> {
+  const res = await fetch(`${API_BASE}/analytics/dashboard/`, {
+    headers: getAuthHeader(),
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Acesso restrito a Gestores do Fundo');
+    }
+    throw new Error('Falha ao carregar dashboard de analytics');
+  }
+  return res.json();
+}
+

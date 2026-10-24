@@ -5,6 +5,7 @@ URLs do app Core do Antecipe.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from core.analytics_views import AnalyticsDashboardView
 from core.auth_views import login_view, me_view, register_view
 from core.views import (
     LoteImportacaoViewSet,
@@ -22,6 +23,9 @@ urlpatterns = [
     path('auth/register/', register_view, name='auth-register'),
     path('auth/login/', login_view, name='auth-login'),
     path('auth/me/', me_view, name='auth-me'),
+
+    # Analytics e Risco (Restrito a GESTOR)
+    path('analytics/dashboard/', AnalyticsDashboardView.as_view(), name='analytics-dashboard'),
 
     # Operações de Negócio
     path('upload-csv/', upload_csv_view, name='upload-csv'),

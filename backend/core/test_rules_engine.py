@@ -206,3 +206,32 @@ class AuthAndRbacTests(TestCase):
         self.client.force_authenticate(user=u_gestor)
         res_gestor = self.client.get('/api/regras/')
         self.assertEqual(res_gestor.status_code, status.HTTP_200_OK)
+
+    def test_analytics_dashboard_rbac_e_agregacoes(self):
+        # 1. Usuários de teste
+        u_gestor = User.objects.create_user(username='g_analytics', password='pwd')
+        PerfilUsuario.objects.create(usuario=u_gestor, role=PerfilUsuario.Role.GESTOR)
+
+        u_empresa = User.objects.create_user(username='e_analytics', password='pwd')
+        PerfilUsuario.objects.create(usuario=u_empresa, role=PerfilUsuario.Role.EMPRESA)
+
+        # 2. Anônimo retorna 401
+        res_anon = self.client.get('/api/analytics/dashboard/')
+        self.assertEqual(res_anon.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # 3. Empresa retorna 403
+        self.client.force_authenticate(user=u_empresa)
+        res_empresa = self.client.get('/api/analytics/dashboard/')
+        self.assertEqual(res_empresa.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 4. Gestor retorna 200 com payload agregado
+        self.client.force_authenticate(user=u_gestor)
+        res_gestor = self.client.get('/api/analytics/dashboard/')
+        self.assertEqual(res_gestor.status_code, status.HTTP_200_OK)
+        dados = res_gestor.json()
+        self.assertIn('kpis', dados)
+        self.assertIn('taxa_rejeicao', dados)
+        self.assertIn('motivos_recusa', dados)
+        self.assertIn('risco_concentracao', dados)
+        self.assertIn('volume_total_aprovado', dados['kpis'])
+
