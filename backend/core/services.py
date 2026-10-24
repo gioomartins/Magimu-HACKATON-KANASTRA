@@ -196,10 +196,10 @@ class ImportadorCSVService:
         )
 
         # 3. Cache de hashes já existentes no banco para checagem rápida de duplicatas
-        # hash_id -> status atual no banco
-        hashes_no_banco = dict(
-            Recebivel.objects.values_list("hash_id", "status")
-        )
+        # hash_id -> (id, status atual no banco)
+        hashes_no_banco: Dict[str, Tuple[Optional[int], str]] = {
+            h: (rid, st) for h, rid, st in Recebivel.objects.values_list("hash_id", "id", "status")
+        }
         # Hashes vistos dentro deste mesmo lote CSV
         hashes_no_lote: Set[str] = set()
 
@@ -302,24 +302,26 @@ class ImportadorCSVService:
             # - Exceção: já existe no banco com status BARRADO e a duplicata nova é aceitável (APROVADO):
             #   atualiza a nota existente.
             eh_duplicada_no_lote = hash_id in hashes_no_lote
-            status_no_banco = hashes_no_banco.get(hash_id)
+            info_banco = hashes_no_banco.get(hash_id)
+            rec_id_no_banco, status_no_banco = info_banco if info_banco else (None, None)
 
             if eh_duplicada_no_lote or (status_no_banco is not None):
                 # É uma duplicata!
-                if status_no_banco == Recebivel.Status.BARRADO and status_calculado == Recebivel.Status.APROVADO:
-                    # EXCEÇÃO: Atualizar a nota existente no banco para APROVADO com os novos dados
-                    rec_existente = Recebivel.objects.filter(hash_id=hash_id, status=Recebivel.Status.BARRADO).first()
-                    if rec_existente:
-                        rec_existente.lote = lote
-                        rec_existente.linha = num_linha
-                        rec_existente.status = Recebivel.Status.APROVADO
-                        rec_existente.barrado_por = []
-                        rec_existente.motivo_recusa = ""
-                        rec_existente.prazo_dias = prazo_dias
-                        rec_existente.desconto = desconto
-                        rec_existente.valor_liquido = valor_liq
-                        recebiveis_para_atualizar.append(rec_existente)
-                        hashes_no_banco[hash_id] = Recebivel.Status.APROVADO
+                if status_no_banco == Recebivel.Status.BARRADO and status_calculado == Recebivel.Status.APROVADO and rec_id_no_banco:
+                    # EXCEÇÃO: Atualizar a nota existente no banco para APROVADO com os novos dados sem query adicional
+                    rec_existente = Recebivel(
+                        id=rec_id_no_banco,
+                        lote=lote,
+                        linha=num_linha,
+                        status=Recebivel.Status.APROVADO,
+                        barrado_por=[],
+                        motivo_recusa="",
+                        prazo_dias=prazo_dias,
+                        desconto=desconto,
+                        valor_liquido=valor_liq,
+                    )
+                    recebiveis_para_atualizar.append(rec_existente)
+                    hashes_no_banco[hash_id] = (rec_id_no_banco, Recebivel.Status.APROVADO)
 
                     log_entry = {
                         "linha": num_linha,
@@ -348,7 +350,7 @@ class ImportadorCSVService:
 
             # Nota não duplicada: submete para a tabela
             hashes_no_lote.add(hash_id)
-            hashes_no_banco[hash_id] = status_calculado
+            hashes_no_banco[hash_id] = (None, status_calculado)
 
             rec = Recebivel(
                 lote=lote,
@@ -425,71 +427,88 @@ class ImportadorCSVService:
         # 8. Gravação de log de registro em arquivo se solicitado
         if caminho_log:
             with open(caminho_log, "w", encoding="utf-8") as flog:
-                json.dump(registros_log, flog, ensure_ascii=False, indent=2)
+                json.dump(registros_log, flog, ensure_ascii=False)
 
         return lote, registros_log, total_ignorados
 
     def _criar_contas_populacao(self, fundos: Dict[str, str], cedentes: Dict[str, str]) -> None:
         """
         Garante contas e registros nas tabelas Cedente e Fundo para cada par do lote importado:
-        - Se o fundo ou cedente JÁ POSSUI cadastro, NENHUMA nova conta é criada e suas
-          credenciais (senha e perfil existentes) são rigorosamente preservadas.
-          Os recebíveis presentes no CSV aparecerão automaticamente em seu cadastro pré-existente.
-        - Se o fundo ou cedente for NOVO, cria a conta com usuário=nome e senha padrão '123456',
-          e cria o respectivo registro na tabela Fundo ou Cedente.
+        - Executa em lote com make_password pré-computado uma única vez para evitar timeout.
         """
+        from django.contrib.auth.hashers import make_password
+
         senha_padrao = "123456"
+        senha_hasheada = make_password(senha_padrao)
 
-        for nome_fundo, doc_fundo in fundos.items():
-            username = nome_fundo.strip()
-            if not username:
-                continue
+        # 1. Processa Fundos
+        nomes_fundos = [n.strip() for n in fundos.keys() if n.strip()]
+        if nomes_fundos:
+            users_existentes = {u.username.lower(): u for u in User.objects.filter(username__in=nomes_fundos)}
+            novos_users = [
+                User(username=nome, password=senha_hasheada, first_name=nome[:30])
+                for nome in nomes_fundos
+                if nome.lower() not in users_existentes
+            ]
+            if novos_users:
+                User.objects.bulk_create(novos_users, ignore_conflicts=True)
+                for u in User.objects.filter(username__in=[nu.username for nu in novos_users]):
+                    users_existentes[u.username.lower()] = u
 
-            usuario_existente = User.objects.filter(username__iexact=username).first()
-            if usuario_existente:
-                user = usuario_existente
-                if not hasattr(user, 'perfil'):
-                    PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
-            else:
-                user = User.objects.create_user(
-                    username=username,
-                    password=senha_padrao,
-                    first_name=username[:30],
-                )
-                PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
+            user_objs = list(users_existentes.values())
+            fundos_db = {f.usuario_id: f for f in Fundo.objects.filter(usuario__in=user_objs)}
+            perfis_db = {p.usuario_id: p for p in PerfilUsuario.objects.filter(usuario__in=user_objs)}
 
-            # Garante o registro na tabela Fundo
-            if not Fundo.objects.filter(usuario=user).exists():
-                Fundo.objects.create(
-                    usuario=user,
-                    nome=nome_fundo,
-                    codigo=doc_fundo or "92.234.400/0001-80",
-                )
+            novos_perfis = []
+            novos_fundos = []
+            for nome, doc in fundos.items():
+                nome_limpo = nome.strip()
+                user = users_existentes.get(nome_limpo.lower())
+                if user:
+                    if user.id not in perfis_db:
+                        novos_perfis.append(PerfilUsuario(usuario=user, role=PerfilUsuario.Role.GESTOR))
+                        perfis_db[user.id] = None
+                    if user.id not in fundos_db:
+                        novos_fundos.append(Fundo(usuario=user, nome=nome_limpo, codigo=doc or "92.234.400/0001-80"))
+                        fundos_db[user.id] = None
+            if novos_perfis:
+                PerfilUsuario.objects.bulk_create(novos_perfis, ignore_conflicts=True)
+            if novos_fundos:
+                Fundo.objects.bulk_create(novos_fundos, ignore_conflicts=True)
 
-        for nome_cedente, doc_cedente in cedentes.items():
-            username = nome_cedente.strip()
-            if not username:
-                continue
+        # 2. Processa Cedentes
+        nomes_cedentes = [n.strip() for n in cedentes.keys() if n.strip()]
+        if nomes_cedentes:
+            users_existentes = {u.username.lower(): u for u in User.objects.filter(username__in=nomes_cedentes)}
+            novos_users = [
+                User(username=nome, password=senha_hasheada, first_name=nome[:30])
+                for nome in nomes_cedentes
+                if nome.lower() not in users_existentes
+            ]
+            if novos_users:
+                User.objects.bulk_create(novos_users, ignore_conflicts=True)
+                for u in User.objects.filter(username__in=[nu.username for nu in novos_users]):
+                    users_existentes[u.username.lower()] = u
 
-            usuario_existente = User.objects.filter(username__iexact=username).first()
-            if usuario_existente:
-                user = usuario_existente
-                if not hasattr(user, 'perfil'):
-                    PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
-            else:
-                user = User.objects.create_user(
-                    username=username,
-                    password=senha_padrao,
-                    first_name=username[:30],
-                )
-                PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
+            user_objs = list(users_existentes.values())
+            cedentes_db = {c.usuario_id: c for c in Cedente.objects.filter(usuario__in=user_objs)}
+            perfis_db = {p.usuario_id: p for p in PerfilUsuario.objects.filter(usuario__in=user_objs)}
 
-            # Garante o registro na tabela Cedente
-            if not Cedente.objects.filter(usuario=user).exists():
-                Cedente.objects.create(
-                    usuario=user,
-                    nome=nome_cedente,
-                    codigo=doc_cedente or "",
-                )
+            novos_perfis = []
+            novos_cedentes = []
+            for nome, doc in cedentes.items():
+                nome_limpo = nome.strip()
+                user = users_existentes.get(nome_limpo.lower())
+                if user:
+                    if user.id not in perfis_db:
+                        novos_perfis.append(PerfilUsuario(usuario=user, role=PerfilUsuario.Role.EMPRESA))
+                        perfis_db[user.id] = None
+                    if user.id not in cedentes_db:
+                        novos_cedentes.append(Cedente(usuario=user, nome=nome_limpo, codigo=doc or ""))
+                        cedentes_db[user.id] = None
+            if novos_perfis:
+                PerfilUsuario.objects.bulk_create(novos_perfis, ignore_conflicts=True)
+            if novos_cedentes:
+                Cedente.objects.bulk_create(novos_cedentes, ignore_conflicts=True)
 
 
