@@ -27,6 +27,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import LoteImportacao, Recebivel, SituacaoCadastralCNPJ
+from core.profiler import profile_performance
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.utils import gerar_hash_recebivel, raiz_cnpj, somente_digitos
 
@@ -116,6 +117,7 @@ class ImportadorCSVService:
             return csv.DictReader(texto, delimiter=";")
         raise ValueError("Tipo de arquivo não suportado para leitura CSV.")
 
+    @profile_performance("Ingestão CSV & Validação em Lote")
     def processar_arquivo(
         self, arquivo_ou_caminho: Any, nome_arquivo: str, caminho_log: Optional[Path] = None
     ) -> Tuple[LoteImportacao, List[Dict[str, Any]]]:
