@@ -38,12 +38,12 @@ Alterar o projeto conforme padrões de design pré-existentes para o frontend.
 
 O sistema possui duas facetas (fazer uma barra nav que transita entre as duas facetas):
 
-1. Faceta dos Cedentes:
+1. Área dos Cedentes:
     1. O cedente visualiza as notas que submeteu para um fundo em uma tabela, onde cada linha é uma nota. A tabela possui informações como o nome do fundo, valor da nota, status de aprovação/reprovação, entre outros.
     2. Para cada linha, há um toggle que possui informações mais detalhadas sobre as notas, e em caso de status rejeitado, terá uma explicação do motivo pela rejeição, conforme as restrições do respectivo fundo vinculado.
     3. Na submissão das notas para a tabela: Em caso de notas duplicadas, a submissão da nota deve ser barrada. Exceção: Caso em que a nota já existe na tabela, mas como recusada, e a duplicata da nota é de um status que é aceitável: a nota deve ser atualizada com as informações da duplicata.
     4. A tabela será paginada, mostrando de 20 em 20 registros de notas. Deve, também, ser filtrável para cada campo de informações das notas.
-2. Faceta dos Fundos: Possui somente um Dashboard com informações de validação, informações pessoais do Fundo e Precificação, conforme arquivo validadores_antecipe.json.
+2. Área dos Fundos: Possui somente um Dashboard com informações de validação, informações pessoais do Fundo e Precificação, conforme arquivo validadores_antecipe.json.
     1. O gestor de fundos submete um JSON com todos os seus validadores e informações como nome e taxa de precificação no Dashboard, assim como o exemplo presente em validadores_antecipe.json.
     2. O JSON submetido preenche um formulário com campos (são fixos para qualquer fundo). Deve ser possível simplesmente preencher o formulário à mão (todos os campos são obrigatórios para serem salvos no banco de dados), ou enviar um JSON ao sistema, assim como os dados existentes no formulário devem ser exportáveis no formato JSON. Os dados submetidos pelo JSON definem quais notas (Recebíveis) serão aprovadas/reprovadas, assim como a precificação final do valor a pagar para o cedente e o valor a reter para o próprio fundo.
-    3. Quanto à atualização dos dados do formulário com um novo JSON: Caso mude valores de validação, as notas que antes eram aprovadas não podem se tornar rejeitadas, mas as antes rejeitadas podem se tornar aprovadas, caso coincida com a nova validação. A precificação também precisa ser atualizada em tempo real. A visualização dessas notas e precificação sendo atualizadas ocorrem através da faceta dos respectivos Cedentes.
+    3. Quanto à atualização dos dados do formulário com um novo JSON: Caso mude valores de validação, as notas que antes eram aprovadas não podem se tornar rejeitadas, mas as antes rejeitadas podem se tornar aprovadas, caso coincida com a nova validação. A precificação também precisa ser atualizada em tempo real. A visualização dessas notas e precificação sendo atualizadas ocorrem através da Área dos respectivos Cedentes.
