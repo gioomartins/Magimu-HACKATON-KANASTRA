@@ -41,10 +41,11 @@ Para facilitar a auditoria e a avaliação da banca avaliadora, o sistema já di
 
 | Perfil / Papel | Usuário | Senha | Escopo de Acesso na Plataforma |
 | :--- | :--- | :--- | :--- |
-| **Cedente (Empresa)** | `cedente_demo` | `password123` | **Faceta do Cedente:** Upload de arquivos CSV, listagem paginada (20/20), toggle de detalhamento com explicação de recusas, simulação financeira em tempo real. Bloqueado de alterar regras do fundo (`403 Forbidden`). |
-| **Fundo (Gestor)** | `gestor_demo` | `password123` | **Acesso Completo:** Todas as funções da empresa + **Área dos Fundos:** Parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
+| **Administrador Geral** | `admin` | `password123` | **Super Gestor / População:** Acesso exclusivo ao dropzone de importação massiva (CSV) na dashboard principal para popular o sistema, criando ou atualizando automaticamente contas de cedentes e fundos com sincronização de senhas. |
+| **Cedente (Empresa)** | `cedente_demo` | `password123` | **Faceta do Cedente:** Upload interno de arquivos CSV para a própria conta, listagem paginada (20/20 com saltos diretos e páginas vizinhas), ordenação por toggle em cada coluna, detalhamento com explicação de recusas, simulação financeira em tempo real. Bloqueado de alterar regras do fundo (`403 Forbidden`). |
+| **Fundo (Gestor)** | `gestor_demo` | `password123` | **Acesso Completo:** Todas as funções da empresa + **Área dos Fundos:** Visualização da carteira sob gestão com ordenação em todas as colunas, parametrização em tempo real das regras do FIDC, alteração de taxas de desconto mensal, importação/exportação de JSON e recálculo instantâneo de liquidez. |
 
-> *Nota:* Usuários alternativos adicionais disponíveis: `empresa_demo` (Empresa) e `fundo_demo` (Gestor), ambos com a senha `password123`.
+> *Nota:* Usuários alternativos adicionais disponíveis: `empresa_demo` (Empresa) e `fundo_demo` (Gestor), ambos com a senha `password123`. A conta `admin` é reservada para administração e não possui atalho rápido de preenchimento na tela de login por motivos de segurança.
 
 ---
 
@@ -99,6 +100,13 @@ $$\text{Prazo (dias)} = \text{Data de Vencimento} - \text{Data de Aquisição}$$
 $$\text{Taxa Efetiva} = \text{Taxa Mensal} \times \left( \frac{\text{Prazo (dias)}}{30} \right)$$
 $$\text{Desconto} = \text{Valor Nominal} \times \text{Taxa Efetiva}$$
 $$\text{Valor Líquido} = \text{Valor Nominal} - \text{Desconto}$$
+
+### 4.5. População do Sistema e Sincronização Dinâmica de Usuários
+Para permitir a simulação completa de ecossistemas com múltiplos cedentes e fundos:
+- **Área Exclusiva de População (`admin`):** O upload de CSV massivo da tela inicial é reservado ao usuário administrador (`admin` / `password123`).
+- **Geração Automática de Contas:** Durante a ingestão de cada lote, o serviço varre os pares únicos de Cedente e Fundo. Caso ainda não possuam conta no Django Auth, são gerados automaticamente usuários com o padrão de senha `123456` (ex: `cedente_<doc>` com papel `EMPRESA` e `fundo_<doc>` com papel `GESTOR`).
+- **Preservação de Cadastros Pré-existentes:** Se um cedente ou fundo já possuir cadastro na base, sua senha e credenciais são estritamente mantidas intactas, e os recebíveis associados do CSV passam a pertencer diretamente à sua conta prévia.
+- **Upload Operacional Interno:** Usuários autenticados de empresas cedentes possuem um botão interno de envio na tabela de recebíveis para submeter seus próprios lotes complementares.
 
 ---
 
@@ -265,7 +273,7 @@ uv run python manage.py migrate
 # Carrega a base de 3.041 situações cadastrais da Receita (cnpj_situacao_mock.csv)
 uv run python manage.py carregar_situacao_cadastral
 
-# Cria as credenciais padrão de teste (cedente_demo e gestor_demo com senha 'password123')
+# Cria as credenciais padrão de teste (admin, cedente_demo e gestor_demo com senha 'password123')
 uv run python manage.py seed_test_users
 
 # Executa os testes automatizados

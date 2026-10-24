@@ -17,7 +17,8 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
 from django.conf import settings
-from core.models import LoteImportacao, PerfilUsuario, Recebivel
+from django.db import models
+from core.models import Cedente, Fundo, LoteImportacao, PerfilUsuario, Recebivel
 from core.permissions import IsGestor
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.serializers import LoteImportacaoSerializer, RecebivelSerializer
@@ -35,8 +36,8 @@ class RecebivelViewSet(viewsets.ModelViewSet):
     CRUD completo para Recebíveis com paginação de 20 em 20.
     Permite filtrar por status, lote, sacado ou número de documento.
     Garante isolamento de dados:
-    - Se usuário EMPRESA (cedente), visualiza somente recebíveis correspondentes ao seu nome_cedente.
-    - Se usuário GESTOR (fundo), visualiza somente recebíveis relacionados ao seu fundo (se o nome corresponder a um fundo).
+    - Se usuário EMPRESA (cedente), visualiza somente recebíveis correspondentes ao seu cadastro na tabela Cedente ou username.
+    - Se usuário GESTOR (fundo), visualiza somente recebíveis relacionados ao seu cadastro na tabela Fundo ou username.
     """
     queryset = Recebivel.objects.all().order_by('-lote__criado_em', 'linha')
     serializer_class = RecebivelSerializer
@@ -52,13 +53,18 @@ class RecebivelViewSet(viewsets.ModelViewSet):
             username = user.username.strip()
 
             if perfil and perfil.role == PerfilUsuario.Role.EMPRESA:
-                # Cedente vê estritamente suas operações
-                # Exceto usuários genéricos de demo como cedente_demo / empresa_demo caso não haja recebíveis com esse nome exato
-                if Recebivel.objects.filter(nome_cedente__iexact=username).exists():
+                # Busca registro na tabela Cedente
+                cedente_obj = Cedente.objects.filter(usuario=user).first()
+                if cedente_obj:
+                    qs = qs.filter(models.Q(nome_cedente__iexact=cedente_obj.nome) | models.Q(doc_cedente=cedente_obj.codigo))
+                elif Recebivel.objects.filter(nome_cedente__iexact=username).exists():
                     qs = qs.filter(nome_cedente__iexact=username)
             elif perfil and perfil.role == PerfilUsuario.Role.GESTOR:
                 # Fundo vê os recebíveis do seu fundo
-                if Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+                fundo_obj = Fundo.objects.filter(usuario=user).first()
+                if fundo_obj:
+                    qs = qs.filter(models.Q(nome_fundo__iexact=fundo_obj.nome) | models.Q(doc_fundo=fundo_obj.codigo))
+                elif Recebivel.objects.filter(nome_fundo__iexact=username).exists():
                     qs = qs.filter(nome_fundo__iexact=username)
 
         lote_id = self.request.query_params.get('lote')
@@ -150,13 +156,21 @@ def upload_csv_view(request):
 @permission_classes([IsGestor])
 def regras_vigentes_view(request):
     """
-    GET: Retorna as regras vigentes e a taxa de precificação do arquivo validadores_antecipe.json.
-    POST / PUT: Atualiza as regras e precificação. Conforme regra da Época 2:
+    GET: Retorna as regras vigentes e a taxa de precificação (priorizando o modelo Fundo do usuário).
+    POST / PUT: Atualiza as regras e precificação no banco (tabela Fundo) e no JSON. Conforme regra da Época 2:
       - As notas aprovadas NUNCA se tornam rejeitadas.
       - As notas antes rejeitadas que agora passarem nas novas regras tornam-se aprovadas.
       - A precificação de todas as notas aprovadas é recalculada em tempo real.
     """
-    service = ImportadorCSVService()
+    # Identifica o fundo associado ao usuário gestor se existir
+    fundo_obj = None
+    if request.user.is_authenticated:
+        fundo_obj = Fundo.objects.filter(usuario=request.user).first()
+    if not fundo_obj:
+        fundo_obj = Fundo.objects.first()
+
+    service = ImportadorCSVService(fundo_id=fundo_obj.id if fundo_obj else None)
+
     if request.method in ['POST', 'PUT']:
         novo_json = request.data
         if not isinstance(novo_json, dict) or 'validadores' not in novo_json:
@@ -165,10 +179,59 @@ def regras_vigentes_view(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Salva no arquivo de regras
+        # 1. Atualiza na tabela Fundo se existir
+        if fundo_obj:
+            fundo_info = novo_json.get("fundo", {})
+            if fundo_info.get("nome"):
+                fundo_obj.nome = fundo_info["nome"]
+            if fundo_info.get("cnpj"):
+                fundo_obj.codigo = fundo_info["cnpj"]
+
+            for v in novo_json.get("validadores", []):
+                cod = v.get("codigo")
+                ativo = v.get("ativo", True)
+                params = v.get("parametros", {})
+
+                if cod == "CNPJ_SACADO_VALIDO":
+                    fundo_obj.validador_cnpj_sacado_ativo = ativo
+                elif cod == "SITUACAO_CADASTRAL_SACADO":
+                    fundo_obj.validador_situacao_cadastral_ativo = ativo
+                    fundo_obj.situacoes_cadastrais_aceitas = params.get("situacoes_aceitas", ["ATIVA"])
+                elif cod == "TIPO_RECEBIVEL":
+                    fundo_obj.validador_tipo_recebivel_ativo = ativo
+                    fundo_obj.tipos_recebivel_aceitos = params.get("tipos_aceitos", ["Duplicata", "Duplicata de Serviço"])
+                elif cod == "VALOR_MINIMO":
+                    fundo_obj.validador_valor_minimo_ativo = ativo
+                    fundo_obj.valor_minimo = Decimal(str(params.get("valor_minimo", 50.0)))
+                elif cod == "NAO_VENCIDA":
+                    fundo_obj.validador_nao_vencida_ativo = ativo
+                elif cod == "PRAZO_MAXIMO":
+                    fundo_obj.validador_prazo_maximo_ativo = ativo
+                    fundo_obj.prazo_maximo_dias = int(params.get("prazo_maximo_dias", 180))
+                elif cod == "CONCENTRACAO_MAXIMA_SACADO":
+                    fundo_obj.validador_concentracao_sacado_ativo = ativo
+                    fundo_obj.concentracao_sacado_percentual = Decimal(str(params.get("percentual_maximo", 10.0)))
+                    fundo_obj.concentracao_sacado_agrupamento = params.get("agrupamento", "RAIZ_CNPJ")
+                elif cod == "PRAZO_MINIMO":
+                    fundo_obj.validador_prazo_minimo_ativo = ativo
+                    fundo_obj.prazo_minimo_dias = int(params.get("prazo_minimo_dias", 30))
+                elif cod == "CONCENTRACAO_MAXIMA_CEDENTE":
+                    fundo_obj.validador_concentracao_cedente_ativo = ativo
+                    fundo_obj.concentracao_cedente_percentual = Decimal(str(params.get("percentual_maximo", 8.0)))
+
+            prec = novo_json.get("precificacao", {})
+            fundo_obj.precificacao_metodo = prec.get("metodo", "DESCONTO_SIMPLES")
+            fundo_obj.taxa_mensal_percentual = Decimal(str(prec.get("taxa_mensal_percentual", 2.0)))
+            fundo_obj.base_dias = int(prec.get("base_dias", 30))
+            fundo_obj.save()
+
+        # Salva também no arquivo de regras para compatibilidade
         caminho = service.caminho_regras
-        with open(caminho, 'w', encoding='utf-8') as f:
-            json.dump(novo_json, f, ensure_ascii=False, indent=2)
+        try:
+            with open(caminho, 'w', encoding='utf-8') as f:
+                json.dump(novo_json, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
         # Recarrega o motor com as novas regras
         service.config_regras = novo_json
@@ -273,7 +336,10 @@ def regras_vigentes_view(request):
             'mensagem': 'Configuração de regras e precificação atualizada com sucesso!',
             'novas_aprovadas': total_novas_aprovadas,
             'total_reprecificadas': total_reprecificadas,
-            'regras': novo_json,
+            'regras': fundo_obj.to_config_dict() if fundo_obj else novo_json,
         })
 
+    # Resposta GET
+    if fundo_obj:
+        return Response(fundo_obj.to_config_dict())
     return Response(service.config_regras)

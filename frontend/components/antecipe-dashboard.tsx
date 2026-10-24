@@ -137,16 +137,18 @@ export function AntecipeDashboard() {
           </div>
         </header>
 
-        {/* Conteúdo Dinâmico Baseado Estritamente no Perfil de Acesso */}
-        <div className="mt-4 space-y-6">
-          {/* Entrada CSV para população do sistema na dashboard (abaixo do header, acima das informações principais) */}
-          {isGestor && (
+        {/* Entrada CSV para população do sistema na dashboard: restrita exclusivamente ao gerente default 'admin' */}
+        {user?.username?.toLowerCase() === 'admin' && (
+          <div className="mt-4">
             <UploadLoteCsv
-              titulo="População do Sistema & Ingestão de Fundo (CSV)"
-              descricao="Importe lotes com centenas de milhares de notas. Cada cedente e fundo novo terá sua conta criada automaticamente (senha padrão 123456)."
+              titulo="População do Sistema & Submissão em Lote (CSV)"
+              descricao="Acesso de Administrador Geral: importe lotes CSV com milhares de notas. Cada cedente e fundo novo terá sua conta criada automaticamente (senha padrão 123456)."
             />
-          )}
+          </div>
+        )}
 
+        {/* Conteúdo Dinâmico Baseado Estritamente no Perfil de Acesso */}
+        <div className="mt-6">
           {isGestor ? <DashboardFundo /> : <TabelaCedente />}
         </div>
 

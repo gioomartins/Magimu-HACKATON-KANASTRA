@@ -17,6 +17,7 @@ Decisões de idempotência (ver docs/regrasnegocio.md):
 
 from __future__ import annotations
 
+from decimal import Decimal
 import uuid
 
 from django.conf import settings
@@ -266,4 +267,196 @@ class PerfilUsuario(models.Model):
 
     def __str__(self) -> str:
         return f'{self.usuario.username} ({self.role})'
+
+
+class Cedente(models.Model):
+    """
+    Tabela de Cedentes.
+    Referencia a tabela de usuários (Auth User) para seu respectivo cadastro na plataforma.
+    Campos: nome e código (CNPJ).
+    """
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cedente',
+        help_text='Usuário associado na plataforma',
+    )
+    nome = models.CharField(max_length=255, db_index=True)
+    codigo = models.CharField(max_length=20, db_index=True, help_text='CNPJ do cedente')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'antecipe_cedente'
+        verbose_name = 'cedente'
+        verbose_name_plural = 'cedentes'
+
+    def __str__(self) -> str:
+        return f'{self.nome} ({self.codigo})'
+
+
+class Fundo(models.Model):
+    """
+    Tabela de Fundos.
+    Referencia a tabela de usuários (Auth User) para seu respectivo cadastro na plataforma.
+    Campos:
+    - nome e código (CNPJ).
+    - Valores e flags booleanas para as validações conforme o modelo de regras JSON:
+      * CNPJ_SACADO_VALIDO (booleano)
+      * SITUACAO_CADASTRAL_SACADO (booleano + situacoes_aceitas)
+      * TIPO_RECEBIVEL (booleano + tipos_aceitos)
+      * VALOR_MINIMO (booleano + valor_minimo)
+      * NAO_VENCIDA (booleano)
+      * PRAZO_MAXIMO (booleano + prazo_maximo_dias)
+      * CONCENTRACAO_MAXIMA_SACADO (booleano + percentual_maximo + agrupamento)
+      * PRAZO_MINIMO (booleano + prazo_minimo_dias)
+      * CONCENTRACAO_MAXIMA_CEDENTE (booleano + percentual_maximo)
+      * Precificação (metodo, taxa_mensal_percentual, base_dias)
+    """
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='fundo',
+        help_text='Usuário gestor associado na plataforma',
+    )
+    nome = models.CharField(max_length=255, db_index=True)
+    codigo = models.CharField(max_length=20, db_index=True, help_text='CNPJ do fundo')
+
+    # Validação 1: CNPJ Sacado Válido
+    validador_cnpj_sacado_ativo = models.BooleanField(default=True)
+
+    # Validação 2: Situação Cadastral Sacado
+    validador_situacao_cadastral_ativo = models.BooleanField(default=True)
+    situacoes_cadastrais_aceitas = ArrayField(
+        models.CharField(max_length=30),
+        default=list,
+        blank=True,
+        help_text='Ex: ["ATIVA"]',
+    )
+
+    # Validação 3: Tipo Recebível
+    validador_tipo_recebivel_ativo = models.BooleanField(default=True)
+    tipos_recebivel_aceitos = ArrayField(
+        models.CharField(max_length=60),
+        default=list,
+        blank=True,
+        help_text='Ex: ["Duplicata", "Duplicata de Serviço"]',
+    )
+
+    # Validação 4: Valor Mínimo
+    validador_valor_minimo_ativo = models.BooleanField(default=True)
+    valor_minimo = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal('50.00'))
+
+    # Validação 5: Não Vencida
+    validador_nao_vencida_ativo = models.BooleanField(default=True)
+
+    # Validação 6: Prazo Máximo
+    validador_prazo_maximo_ativo = models.BooleanField(default=True)
+    prazo_maximo_dias = models.PositiveIntegerField(default=180)
+
+    # Validação 7: Concentração Máxima Sacado
+    validador_concentracao_sacado_ativo = models.BooleanField(default=True)
+    concentracao_sacado_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('10.00'))
+    concentracao_sacado_agrupamento = models.CharField(max_length=20, default='RAIZ_CNPJ')
+
+    # Validação 8: Prazo Mínimo
+    validador_prazo_minimo_ativo = models.BooleanField(default=False)
+    prazo_minimo_dias = models.PositiveIntegerField(default=30)
+
+    # Validação 9: Concentração Máxima Cedente
+    validador_concentracao_cedente_ativo = models.BooleanField(default=False)
+    concentracao_cedente_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('8.00'))
+
+    # Precificação
+    precificacao_metodo = models.CharField(max_length=50, default='DESCONTO_SIMPLES')
+    taxa_mensal_percentual = models.DecimalField(max_digits=7, decimal_places=4, default=Decimal('2.00'))
+    base_dias = models.PositiveIntegerField(default=30)
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'antecipe_fundo'
+        verbose_name = 'fundo'
+        verbose_name_plural = 'fundos'
+
+    def __str__(self) -> str:
+        return f'{self.nome} ({self.codigo})'
+
+    def to_config_dict(self) -> dict:
+        """Converte a configuração do fundo para o formato do JSON de validadores."""
+        return {
+            "fundo": {
+                "nome": self.nome,
+                "cnpj": self.codigo,
+            },
+            "validadores": [
+                {
+                    "codigo": "CNPJ_SACADO_VALIDO",
+                    "ativo": self.validador_cnpj_sacado_ativo,
+                    "parametros": {},
+                },
+                {
+                    "codigo": "SITUACAO_CADASTRAL_SACADO",
+                    "ativo": self.validador_situacao_cadastral_ativo,
+                    "parametros": {
+                        "situacoes_aceitas": self.situacoes_cadastrais_aceitas or ["ATIVA"]
+                    },
+                },
+                {
+                    "codigo": "TIPO_RECEBIVEL",
+                    "ativo": self.validador_tipo_recebivel_ativo,
+                    "parametros": {
+                        "tipos_aceitos": self.tipos_recebivel_aceitos or ["Duplicata", "Duplicata de Serviço"]
+                    },
+                },
+                {
+                    "codigo": "VALOR_MINIMO",
+                    "ativo": self.validador_valor_minimo_ativo,
+                    "parametros": {
+                        "valor_minimo": float(self.valor_minimo)
+                    },
+                },
+                {
+                    "codigo": "NAO_VENCIDA",
+                    "ativo": self.validador_nao_vencida_ativo,
+                    "parametros": {},
+                },
+                {
+                    "codigo": "PRAZO_MAXIMO",
+                    "ativo": self.validador_prazo_maximo_ativo,
+                    "parametros": {
+                        "prazo_maximo_dias": self.prazo_maximo_dias
+                    },
+                },
+                {
+                    "codigo": "CONCENTRACAO_MAXIMA_SACADO",
+                    "ativo": self.validador_concentracao_sacado_ativo,
+                    "parametros": {
+                        "percentual_maximo": float(self.concentracao_sacado_percentual),
+                        "agrupamento": self.concentracao_sacado_agrupamento or "RAIZ_CNPJ",
+                    },
+                },
+                {
+                    "codigo": "PRAZO_MINIMO",
+                    "ativo": self.validador_prazo_minimo_ativo,
+                    "parametros": {
+                        "prazo_minimo_dias": self.prazo_minimo_dias
+                    },
+                },
+                {
+                    "codigo": "CONCENTRACAO_MAXIMA_CEDENTE",
+                    "ativo": self.validador_concentracao_cedente_ativo,
+                    "parametros": {
+                        "percentual_maximo": float(self.concentracao_cedente_percentual)
+                    },
+                },
+            ],
+            "precificacao": {
+                "metodo": self.precificacao_metodo,
+                "taxa_mensal_percentual": float(self.taxa_mensal_percentual),
+                "base_dias": self.base_dias,
+            },
+        }
+
 

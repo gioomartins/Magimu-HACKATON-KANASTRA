@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Download, FileJson, RefreshCw, Save, ShieldCheck, Sparkles, Upload } from 'lucide-react'
 import { fetchRegras, FundoConfig, updateRegras } from '@/lib/api'
+import { TabelaCedente } from './tabela-cedente'
 
 export function DashboardFundo() {
   const [config, setConfig] = useState<FundoConfig | null>(null)
@@ -136,11 +137,11 @@ export function DashboardFundo() {
               onClick={handleExportarJson}
               className="flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-900/60"
             >
-              <Download size={14} /> Exportar JSON
+              <Upload size={14} /> Exportar JSON
             </button>
 
             <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-900/60">
-              <Upload size={14} /> Importar JSON
+              <Download size={14} /> Importar JSON
               <input type="file" accept=".json" onChange={handleUploadJson} className="sr-only" />
             </label>
 
@@ -382,37 +383,91 @@ export function DashboardFundo() {
 
                   {val.codigo === 'TIPO_RECEBIVEL' && (
                     <div>
-                      <label className="font-semibold text-stone-600">Tipos Aceitos (separados por vírgula):</label>
-                      <input
-                        type="text"
-                        value={(val.parametros.tipos_aceitos || []).join(', ')}
-                        onChange={(e) =>
-                          updateParametro(
-                            idx,
-                            'tipos_aceitos',
-                            e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                      <label className="block font-semibold text-stone-600 mb-2">
+                        Tipos Aceitos (selecione as opções permitidas):
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {[
+                          'Duplicata',
+                          'Duplicata de Serviço',
+                          'Cheque',
+                          'CCB',
+                          'Nota Comercial',
+                        ].map((tipoOpcao) => {
+                          const selecionados: string[] = val.parametros.tipos_aceitos || []
+                          const isChecked = selecionados.includes(tipoOpcao)
+
+                          return (
+                            <label
+                              key={tipoOpcao}
+                              className={`flex items-center gap-2 rounded-lg border p-2 text-xs cursor-pointer transition ${
+                                isChecked
+                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-semibold'
+                                  : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const novos = e.target.checked
+                                    ? [...selecionados, tipoOpcao]
+                                    : selecionados.filter((t) => t !== tipoOpcao)
+                                  updateParametro(idx, 'tipos_aceitos', novos)
+                                }}
+                                className="size-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{tipoOpcao}</span>
+                            </label>
                           )
-                        }
-                        className="mt-1 w-full rounded border border-stone-300 p-1.5 text-xs"
-                      />
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-[10px] text-stone-500">
+                        Selecionados: {(val.parametros.tipos_aceitos || []).join(', ') || 'Nenhum (rejeitará todos)'}
+                      </p>
                     </div>
                   )}
 
                   {val.codigo === 'SITUACAO_CADASTRAL_SACADO' && (
                     <div>
-                      <label className="font-semibold text-stone-600">Situações Aceitas:</label>
-                      <input
-                        type="text"
-                        value={(val.parametros.situacoes_aceitas || []).join(', ')}
-                        onChange={(e) =>
-                          updateParametro(
-                            idx,
-                            'situacoes_aceitas',
-                            e.target.value.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+                      <label className="block font-semibold text-stone-600 mb-2">
+                        Situação Cadastral Aceita:
+                      </label>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {[
+                          { label: 'Ativa', value: 'ATIVA' },
+                          { label: 'Inapta', value: 'INAPTA' },
+                        ].map((opcao) => {
+                          const situacoesAtuais: string[] = (val.parametros.situacoes_aceitas || []).map((s: string) =>
+                            s.toUpperCase()
                           )
-                        }
-                        className="mt-1 w-full rounded border border-stone-300 p-1.5 text-xs"
-                      />
+                          const isSelected = situacoesAtuais.includes(opcao.value)
+
+                          return (
+                            <label
+                              key={opcao.value}
+                              className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs cursor-pointer transition ${
+                                isSelected
+                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold shadow-sm'
+                                  : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`situacao_cadastral_${idx}`}
+                                value={opcao.value}
+                                checked={isSelected}
+                                onChange={() => {
+                                  updateParametro(idx, 'situacoes_aceitas', [opcao.value])
+                                }}
+                                className="size-4 border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{opcao.label}</span>
+                              <span className="text-[10px] uppercase font-mono text-stone-400">({opcao.value})</span>
+                            </label>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -426,6 +481,15 @@ export function DashboardFundo() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Carteira de Recebíveis do Fundo com ordenação e filtros */}
+      <section className="mt-8">
+        <TabelaCedente
+          tipo="fundo"
+          titulo="Carteira de Recebíveis sob Gestão"
+          subtitulo="Visão Executiva do Fundo"
+        />
       </section>
     </div>
   )

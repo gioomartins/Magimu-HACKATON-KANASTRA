@@ -150,21 +150,35 @@ class AuthAndRbacTests(TestCase):
         # 1. Registrar usuário EMPRESA
         res_reg_empresa = self.client.post(
             '/api/auth/register/',
-            {'username': 'empresa1', 'password': 'senha123_empresa', 'role': 'EMPRESA'},
+            {
+                'username': 'empresa1',
+                'password': 'senha123_empresa',
+                'role': 'EMPRESA',
+                'nome': 'Empresa Um LTDA',
+                'cnpj': '11.222.333/0001-44',
+            },
             format='json',
         )
         self.assertEqual(res_reg_empresa.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_reg_empresa.json()['role'], 'EMPRESA')
+        self.assertEqual(res_reg_empresa.json()['nome'], 'Empresa Um LTDA')
         self.assertIn('token', res_reg_empresa.json())
 
         # 2. Registrar usuário GESTOR
         res_reg_gestor = self.client.post(
             '/api/auth/register/',
-            {'username': 'gestor1', 'password': 'senha123_gestor', 'role': 'GESTOR'},
+            {
+                'username': 'gestor1',
+                'password': 'senha123_gestor',
+                'role': 'GESTOR',
+                'nome': 'Fundo Alpha FIDC',
+                'cnpj': '99.888.777/0001-66',
+            },
             format='json',
         )
         self.assertEqual(res_reg_gestor.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res_reg_gestor.json()['role'], 'GESTOR')
+        self.assertEqual(res_reg_gestor.json()['nome'], 'Fundo Alpha FIDC')
 
         # 3. Login usuário GESTOR
         res_login = self.client.post(

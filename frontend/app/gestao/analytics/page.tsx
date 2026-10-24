@@ -225,14 +225,16 @@ export default function AnalyticsGestorPage() {
           </div>
         )}
 
-        {/* Entrada CSV para população do sistema na dashboard do gestor */}
-        <div className="mb-8">
-          <UploadLoteCsv
-            onUploadSuccess={carregarDados}
-            titulo="População do Sistema & Ingestão de Recebíveis (CSV)"
-            descricao="Submeta arquivos CSV para popular recebíveis, fundos e cedentes no sistema. As estatísticas e gráficos refletirão imediatamente a carteira do fundo."
-          />
-        </div>
+        {/* Entrada CSV para população do sistema na dashboard do gestor: restrita ao gerente default 'admin' */}
+        {user?.username?.toLowerCase() === 'admin' && (
+          <div className="mb-8">
+            <UploadLoteCsv
+              onUploadSuccess={carregarDados}
+              titulo="População do Sistema & Ingestão de Recebíveis (CSV)"
+              descricao="Acesso de Administrador Geral: submeta arquivos CSV para popular recebíveis, fundos e cedentes no sistema. As estatísticas e gráficos refletirão imediatamente a carteira."
+            />
+          </div>
+        )}
 
         {/* 1. LINHA SUPERIOR COM OS 3 HIGH-LEVEL KPIS (Cards Off-White) */}
         <section className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-3">

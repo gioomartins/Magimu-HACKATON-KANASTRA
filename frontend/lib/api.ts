@@ -56,6 +56,8 @@ export interface AuthResponse {
   refresh: string;
   username: string;
   role: 'GESTOR' | 'EMPRESA';
+  nome?: string;
+  cnpj?: string;
   mensagem?: string;
 }
 
@@ -82,11 +84,17 @@ export async function loginApi(username: string, password: string): Promise<Auth
   return res.json();
 }
 
-export async function registerApi(username: string, password: string, role: 'GESTOR' | 'EMPRESA'): Promise<AuthResponse> {
+export async function registerApi(data: {
+  username: string;
+  password: string;
+  role: 'GESTOR' | 'EMPRESA';
+  nome: string;
+  cnpj: string;
+}): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/auth/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, role }),
+    body: JSON.stringify(data),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

@@ -7,6 +7,8 @@ export type UserRole = 'GESTOR' | 'EMPRESA'
 export interface AuthUser {
   username: string
   role: UserRole
+  nome?: string
+  cnpj?: string
 }
 
 interface AuthContextType {

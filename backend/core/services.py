@@ -27,7 +27,14 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import LoteImportacao, PerfilUsuario, Recebivel, SituacaoCadastralCNPJ
+from core.models import (
+    Cedente,
+    Fundo,
+    LoteImportacao,
+    PerfilUsuario,
+    Recebivel,
+    SituacaoCadastralCNPJ,
+)
 from core.profiler import profile_performance
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.utils import gerar_hash_recebivel, raiz_cnpj, somente_digitos
@@ -47,13 +54,32 @@ def parse_decimal_br(valor_str: str) -> Decimal:
 
 
 class ImportadorCSVService:
-    def __init__(self, caminho_regras: Optional[Path] = None, data_base: Optional[date] = None):
+    def __init__(self, caminho_regras: Optional[Path] = None, data_base: Optional[date] = None, fundo_id: Optional[int] = None):
         self.caminho_regras = caminho_regras or settings.ANTECIPE_VALIDADORES_PATH
         self.data_base = data_base or settings.ANTECIPE_DATA_BASE
+        self.fundo_id = fundo_id
         self.config_regras = self._carregar_config_regras()
         self.motor = MotorDeRegras(self.config_regras)
 
     def _carregar_config_regras(self) -> Dict[str, Any]:
+        """
+        Carrega regras de validação.
+        Prioridade:
+        1. Se houver fundo_id ou registro na tabela Fundo, carrega do modelo Fundo no banco.
+        2. Se não houver, carrega do JSON modelo (validadores_antecipe.json).
+        """
+        try:
+            fundo_obj = None
+            if self.fundo_id:
+                fundo_obj = Fundo.objects.filter(id=self.fundo_id).first()
+            if not fundo_obj:
+                fundo_obj = Fundo.objects.first()
+
+            if fundo_obj:
+                return fundo_obj.to_config_dict()
+        except Exception as e:
+            logger.warning(f"Não foi possível carregar regras da tabela Fundo: {e}")
+
         if Path(self.caminho_regras).exists():
             with open(self.caminho_regras, encoding="utf-8") as f:
                 return json.load(f)
@@ -156,9 +182,9 @@ class ImportadorCSVService:
         # Hashes vistos dentro deste mesmo lote CSV
         hashes_no_lote: Set[str] = set()
 
-        # Coleta de nomes de fundos e cedentes para criação automática de contas de população
-        fundos_vistos: Set[str] = set()
-        cedentes_vistos: Set[str] = set()
+        # Coleta de dados de fundos e cedentes para criação automática de contas e registros de população
+        fundos_vistos: Dict[str, str] = {}
+        cedentes_vistos: Dict[str, str] = {}
 
         registros_log: List[Dict[str, Any]] = []
         novos_recebiveis: List[Recebivel] = []
@@ -197,15 +223,15 @@ class ImportadorCSVService:
             val_nom_total += valor
             nome_fundo = row.get("NOME_FUNDO", "").strip()
             nome_cedente = row.get("NOME_CEDENTE", "").strip()
-            if nome_fundo:
-                fundos_vistos.add(nome_fundo)
-            if nome_cedente:
-                cedentes_vistos.add(nome_cedente)
-
             doc_cedente = row["DOC_CEDENTE"].strip()
             doc_sacado = row["DOC_SACADO"].strip()
             doc_fundo = row["DOC_FUNDO"].strip()
             tipo_rec = row["TIPO_RECEBIVEL"].strip()
+
+            if nome_fundo and nome_fundo not in fundos_vistos:
+                fundos_vistos[nome_fundo] = doc_fundo
+            if nome_cedente and nome_cedente not in cedentes_vistos:
+                cedentes_vistos[nome_cedente] = doc_cedente
 
             hash_id = gerar_hash_recebivel(doc_cedente, doc_sacado, nu_doc, dt_venc)
 
@@ -367,56 +393,67 @@ class ImportadorCSVService:
 
         return lote, registros_log
 
-    def _criar_contas_populacao(self, fundos: Set[str], cedentes: Set[str]) -> None:
+    def _criar_contas_populacao(self, fundos: Dict[str, str], cedentes: Dict[str, str]) -> None:
         """
-        Garante contas para cada fundo e cedente do lote importado:
+        Garante contas e registros nas tabelas Cedente e Fundo para cada par do lote importado:
         - Se o fundo ou cedente JÁ POSSUI cadastro, NENHUMA nova conta é criada e suas
           credenciais (senha e perfil existentes) são rigorosamente preservadas.
           Os recebíveis presentes no CSV aparecerão automaticamente em seu cadastro pré-existente.
-        - Se o fundo ou cedente for NOVO, cria a conta com usuário=nome e senha padrão '123456'.
+        - Se o fundo ou cedente for NOVO, cria a conta com usuário=nome e senha padrão '123456',
+          e cria o respectivo registro na tabela Fundo ou Cedente.
         """
         senha_padrao = "123456"
 
-        for nome_fundo in fundos:
+        for nome_fundo, doc_fundo in fundos.items():
             username = nome_fundo.strip()
             if not username:
                 continue
 
-            # Se o usuário já existe (por nome ou case-insensitive), não cria nova conta e preserva
             usuario_existente = User.objects.filter(username__iexact=username).first()
             if usuario_existente:
-                # Cadastro pré-existente: preserva credenciais e garante vínculo do perfil
-                if not hasattr(usuario_existente, 'perfil'):
-                    PerfilUsuario.objects.create(usuario=usuario_existente, role=PerfilUsuario.Role.GESTOR)
-                continue
+                user = usuario_existente
+                if not hasattr(user, 'perfil'):
+                    PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
+            else:
+                user = User.objects.create_user(
+                    username=username,
+                    password=senha_padrao,
+                    first_name=username[:30],
+                )
+                PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
 
-            # Usuário novo: cria com a senha padrão 123456 e role GESTOR
-            user = User.objects.create_user(
-                username=username,
-                password=senha_padrao,
-                first_name=username[:30],
-            )
-            PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
+            # Garante o registro na tabela Fundo
+            if not Fundo.objects.filter(usuario=user).exists():
+                Fundo.objects.create(
+                    usuario=user,
+                    nome=nome_fundo,
+                    codigo=doc_fundo or "92.234.400/0001-80",
+                )
 
-        for nome_cedente in cedentes:
+        for nome_cedente, doc_cedente in cedentes.items():
             username = nome_cedente.strip()
             if not username:
                 continue
 
-            # Se o usuário já existe (por nome ou case-insensitive), não cria nova conta e preserva
             usuario_existente = User.objects.filter(username__iexact=username).first()
             if usuario_existente:
-                # Cadastro pré-existente: preserva credenciais e garante perfil
-                if not hasattr(usuario_existente, 'perfil'):
-                    PerfilUsuario.objects.create(usuario=usuario_existente, role=PerfilUsuario.Role.EMPRESA)
-                continue
+                user = usuario_existente
+                if not hasattr(user, 'perfil'):
+                    PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
+            else:
+                user = User.objects.create_user(
+                    username=username,
+                    password=senha_padrao,
+                    first_name=username[:30],
+                )
+                PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
 
-            # Usuário novo: cria com a senha padrão 123456 e role EMPRESA
-            user = User.objects.create_user(
-                username=username,
-                password=senha_padrao,
-                first_name=username[:30],
-            )
-            PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
+            # Garante o registro na tabela Cedente
+            if not Cedente.objects.filter(usuario=user).exists():
+                Cedente.objects.create(
+                    usuario=user,
+                    nome=nome_cedente,
+                    codigo=doc_cedente or "",
+                )
 
 

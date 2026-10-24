@@ -1,7 +1,6 @@
-import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from core.models import PerfilUsuario
+from core.models import Cedente, Fundo, PerfilUsuario
 
 
 class Command(BaseCommand):
@@ -16,6 +15,8 @@ class Command(BaseCommand):
                 "role": PerfilUsuario.Role.EMPRESA,
                 "first_name": "Ana",
                 "last_name": "Cedente",
+                "nome_entidade": "Ana Indústria e Comércio LTDA",
+                "cnpj": "10.062.050/0001-57",
             },
             {
                 "username": "empresa_demo",
@@ -24,6 +25,8 @@ class Command(BaseCommand):
                 "role": PerfilUsuario.Role.EMPRESA,
                 "first_name": "Empresa",
                 "last_name": "Demo",
+                "nome_entidade": "NLR INDÚSTRIA DE ESTOFADOS LTDA ME",
+                "cnpj": "10.062.050/0001-57",
             },
             {
                 "username": "gestor_demo",
@@ -32,6 +35,8 @@ class Command(BaseCommand):
                 "role": PerfilUsuario.Role.GESTOR,
                 "first_name": "Gestor",
                 "last_name": "FIDC",
+                "nome_entidade": "ANTECIPE FIDC",
+                "cnpj": "92.234.400/0001-80",
             },
             {
                 "username": "fundo_demo",
@@ -40,6 +45,18 @@ class Command(BaseCommand):
                 "role": PerfilUsuario.Role.GESTOR,
                 "first_name": "Fundo",
                 "last_name": "Demo",
+                "nome_entidade": "ANTECIPE CRÉDITO FIDC MULTISETORIAL",
+                "cnpj": "92.234.400/0001-80",
+            },
+            {
+                "username": "admin",
+                "email": "admin@antecipe.com",
+                "password": "password123",
+                "role": PerfilUsuario.Role.GESTOR,
+                "first_name": "Administrador",
+                "last_name": "Gerente",
+                "nome_entidade": "ANTECIPE GESTORA GLOBAL FIDC",
+                "cnpj": "92.234.400/0001-80",
             },
         ]
 
@@ -60,9 +77,33 @@ class Command(BaseCommand):
             perfil.role = u_data["role"]
             perfil.save()
 
+            # Popula ou atualiza tabela Cedente ou Fundo
+            if u_data["role"] == PerfilUsuario.Role.EMPRESA:
+                cedente_obj, _ = Cedente.objects.get_or_create(
+                    usuario=user,
+                    defaults={
+                        "nome": u_data["nome_entidade"],
+                        "codigo": u_data["cnpj"],
+                    },
+                )
+                cedente_obj.nome = u_data["nome_entidade"]
+                cedente_obj.codigo = u_data["cnpj"]
+                cedente_obj.save()
+            elif u_data["role"] == PerfilUsuario.Role.GESTOR:
+                fundo_obj, _ = Fundo.objects.get_or_create(
+                    usuario=user,
+                    defaults={
+                        "nome": u_data["nome_entidade"],
+                        "codigo": u_data["cnpj"],
+                    },
+                )
+                fundo_obj.nome = u_data["nome_entidade"]
+                fundo_obj.codigo = u_data["cnpj"]
+                fundo_obj.save()
+
             status_str = "criado" if created else "atualizado"
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"✓ Usuário '{user.username}' ({perfil.role}) {status_str} com sucesso! Senha: '{u_data['password']}'"
+                    f"✓ Usuário '{user.username}' ({perfil.role}) {status_str} com sucesso! Entidade: '{u_data['nome_entidade']}'"
                 )
             )

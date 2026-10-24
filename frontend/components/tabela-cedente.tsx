@@ -2,23 +2,38 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertCircle,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   ArrowUpDown,
   ArrowUpRight,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  ChevronsLeft,
+  ChevronsRight,
   FileUp,
   Filter,
   RefreshCw,
+  RotateCcw,
   Search,
   Upload,
   X,
 } from 'lucide-react'
-import { fetchRecebiveis, RecebivelItem } from '@/lib/api'
-import { UploadLoteCsv } from './upload-lote-csv'
+import { fetchRecebiveis, RecebivelItem, uploadCSV } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
+
+type SortColumn =
+  | 'nu_documento'
+  | 'nome_fundo'
+  | 'nome_sacado'
+  | 'data_vencimento_original'
+  | 'valor_nominal'
+  | 'status'
 
 function MetricCard({
   label,
@@ -51,20 +66,33 @@ function MetricCard({
   )
 }
 
-export function TabelaCedente() {
+export function TabelaCedente({
+  tipo = 'cedente',
+  titulo,
+  subtitulo,
+}: {
+  tipo?: 'cedente' | 'fundo'
+  titulo?: string
+  subtitulo?: string
+}) {
+  const { user } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<RecebivelItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null)
+  const [uploadMsg, setUploadMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
 
   // Filtros
   const [statusFilter, setStatusFilter] = useState<'TODOS' | 'APROVADO' | 'BARRADO'>('TODOS')
   const [filtroDoc, setFiltroDoc] = useState('')
   const [filtroSacado, setFiltroSacado] = useState('')
   const [filtroFundo, setFiltroFundo] = useState('')
+
+  // Ordenação
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
 
   // Linhas expandidas (toggles de detalhes e explicação de recusa)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
@@ -102,33 +130,109 @@ export function TabelaCedente() {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
+  const handleToggleSort = (col: SortColumn) => {
+    if (sortColumn !== col) {
+      setSortColumn(col)
+      setSortDirection('asc')
+    } else {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    }
+  }
+
+  const handleResetSort = () => {
+    setSortColumn(null)
+    setSortDirection(null)
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setUploadMsg('Enviando e validando lote de recebíveis...')
+    setUploadMsg(null)
     try {
       const res = await uploadCSV(file)
-      setUploadMsg(
-        `Lote processado! ${res.lote.total_aprovados} aprovados, ${res.lote.total_barrados} recusados/duplicados.`
-      )
+      const aprovados = res.lote?.total_aprovados ?? 0
+      const barrados = res.lote?.total_barrados ?? 0
+      setUploadMsg({
+        tipo: 'ok',
+        texto: `Lote submetido com sucesso! ${aprovados} aprovados, ${barrados} recusados/duplicados.`,
+      })
       setPage(1)
-      carregarDados()
+      await carregarDados()
     } catch (err: any) {
-      setUploadMsg(`Erro no envio: ${err.message}`)
+      setUploadMsg({
+        tipo: 'erro',
+        texto: `Erro no envio: ${err.message || 'Falha ao processar arquivo'}`,
+      })
     } finally {
       setUploading(false)
+      if (inputRef.current) {
+        inputRef.current.value = ''
+      }
     }
   }
 
-  // Filtragem local complementar para Sacado e Fundo
-  const filteredList = useMemo(() => {
-    return items.filter((item) => {
+  // Filtragem local complementar para Sacado e Fundo + Ordenação customizada
+  const sortedAndFilteredList = useMemo(() => {
+    const list = items.filter((item) => {
       const matchSacado = !filtroSacado || item.nome_sacado.toLowerCase().includes(filtroSacado.toLowerCase())
       const matchFundo = !filtroFundo || item.nome_fundo.toLowerCase().includes(filtroFundo.toLowerCase())
       return matchSacado && matchFundo
     })
-  }, [items, filtroSacado, filtroFundo])
+
+    if (!sortColumn || !sortDirection) {
+      return list
+    }
+
+    const parseDateValue = (str: string) => {
+      if (!str) return 0
+      if (str.includes('/')) {
+        const [d, m, y] = str.split('/')
+        return new Date(Number(y), Number(m) - 1, Number(d)).getTime()
+      }
+      return new Date(str).getTime()
+    }
+
+    return [...list].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortColumn) {
+        case 'valor_nominal': {
+          const valA = parseFloat(a.valor_nominal) || 0
+          const valB = parseFloat(b.valor_nominal) || 0
+          comparison = valA - valB
+          break
+        }
+        case 'data_vencimento_original': {
+          const dateA = parseDateValue(a.data_vencimento_original)
+          const dateB = parseDateValue(b.data_vencimento_original)
+          comparison = dateA - dateB
+          break
+        }
+        case 'status': {
+          // No primeiro clique (asc), aprovados vêm primeiro
+          const rankA = a.status === 'APROVADO' ? 0 : 1
+          const rankB = b.status === 'APROVADO' ? 0 : 1
+          comparison = rankA - rankB
+          break
+        }
+        case 'nu_documento': {
+          comparison = a.nu_documento.localeCompare(b.nu_documento, undefined, { numeric: true })
+          break
+        }
+        case 'nome_fundo': {
+          comparison = a.nome_fundo.localeCompare(b.nome_fundo, undefined, { sensitivity: 'base' })
+          break
+        }
+        case 'nome_sacado': {
+          comparison = a.nome_sacado.localeCompare(b.nome_sacado, undefined, { sensitivity: 'base' })
+          break
+        }
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [items, filtroSacado, filtroFundo, sortColumn, sortDirection])
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
@@ -139,18 +243,28 @@ export function TabelaCedente() {
       .reduce((acc, curr) => acc + (parseFloat(curr.valor_liquido || '0') || 0), 0)
   }, [items])
 
+  const headerTitle =
+    titulo ||
+    (tipo === 'fundo'
+      ? user?.nome
+        ? `Carteira de Recebíveis · ${user.nome}`
+        : 'Carteira de Recebíveis do Fundo'
+      : user?.nome
+      ? `Carteira de Notas · ${user.nome}`
+      : 'Carteira de Notas Submetidas')
+
+  const headerSubtitle =
+    subtitulo ||
+    (tipo === 'fundo'
+      ? user?.cnpj
+        ? `Fundo Gestor · CNPJ: ${user.cnpj}`
+        : 'Visão do Gestor FIDC'
+      : user?.cnpj
+      ? `Cedente · CNPJ: ${user.cnpj}`
+      : 'Visão do Cedente')
+
   return (
     <div className="space-y-6">
-      {/* Upload de CSV com verificação de duplicidade e população amigável */}
-      <UploadLoteCsv
-        onUploadSuccess={() => {
-          setPage(1)
-          carregarDados()
-        }}
-        titulo="Submeter Notas / Recebíveis"
-        descricao="Formato CSV com separador ponto e vírgula (;) · Popula cedentes e fundos com contas de acesso automático e sincroniza a carteira."
-      />
-
       {/* Cards de Métricas */}
       <div className="grid gap-3 md:grid-cols-3">
         <MetricCard label="Notas no Sistema" value={totalCount.toLocaleString('pt-BR')} detail="recebíveis catalogados" />
@@ -172,11 +286,11 @@ export function TabelaCedente() {
       <section className="rounded-2xl bg-[#f8f6f1] p-5 text-stone-800 shadow-[0_20px_60px_rgba(0,0,0,0.14)] sm:p-7">
         <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">Visão do Cedente</p>
-            <h3 className="text-xl font-bold text-stone-800">Carteira de Notas Submetidas</h3>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">{headerSubtitle}</p>
+            <h3 className="text-xl font-bold text-stone-800">{headerTitle}</h3>
           </div>
 
-          {/* Filtros Rápidos */}
+          {/* Filtros Rápidos & Ações no Canto Superior Direito */}
           <div className="flex flex-wrap items-center gap-2">
             {(['TODOS', 'APROVADO', 'BARRADO'] as const).map((st) => (
               <button
@@ -202,8 +316,74 @@ export function TabelaCedente() {
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
+
+            {/* Botão de Envio de CSV interno da Área do Cedente */}
+            {tipo === 'cedente' && user && (
+              <>
+                <input
+                  type="file"
+                  ref={inputRef}
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={uploading}
+                  title="Submeter novo lote de recebíveis via CSV"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2c20] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#124231] disabled:opacity-50 transition"
+                >
+                  <Upload size={13} className={uploading ? 'animate-bounce' : ''} />
+                  <span>{uploading ? 'Enviando...' : 'Enviar CSV'}</span>
+                </button>
+              </>
+            )}
+
+            {/* Botão de Reverter Ordem no canto superior direito da tabela */}
+            <button
+              type="button"
+              onClick={handleResetSort}
+              disabled={!sortColumn && !sortDirection}
+              title="Reverter ordenação para ordem original"
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                sortColumn
+                  ? 'border-emerald-700/30 bg-emerald-900/10 text-emerald-900 hover:bg-emerald-900/20 shadow-sm'
+                  : 'border-stone-200 bg-stone-100 text-stone-400 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <RotateCcw size={13} className={sortColumn ? 'text-emerald-700' : 'text-stone-400'} />
+              <span>Reverter ordem</span>
+            </button>
           </div>
         </div>
+
+        {/* Mensagem de Feedback de Upload Interno */}
+        {uploadMsg && (
+          <div
+            className={`mb-4 flex items-center justify-between gap-2 rounded-xl p-3 text-xs font-medium border ${
+              uploadMsg.tipo === 'ok'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {uploadMsg.tipo === 'ok' ? (
+                <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+              ) : (
+                <AlertCircle size={16} className="text-rose-600 shrink-0" />
+              )}
+              <span>{uploadMsg.texto}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUploadMsg(null)}
+              className="text-stone-400 hover:text-stone-600"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Barra de Busca e Filtros de Coluna */}
         <form onSubmit={handleSearch} className="mb-6 grid gap-3 rounded-xl border border-stone-200 bg-stone-50/70 p-3 sm:grid-cols-3">
@@ -242,23 +422,125 @@ export function TabelaCedente() {
         {/* Tabela de Notas */}
         <div className="overflow-x-auto">
           <div className="min-w-[850px]">
-            {/* Header */}
-            <div className="grid grid-cols-[1.2fr_1.8fr_1.8fr_1fr_1.1fr_1fr_0.8fr] border-b border-stone-200/80 px-4 pb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
-              <span>Nota</span>
-              <span>Fundo</span>
-              <span>Sacado</span>
-              <span>Vencimento</span>
-              <span>Valor Nominal</span>
-              <span>Status</span>
+            {/* Header com botões de Toggle de Ordenação */}
+            <div className="grid grid-cols-[1.2fr_1.8fr_1.8fr_1.1fr_1.2fr_1fr_0.8fr] border-b border-stone-200/80 px-4 pb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">
+              <div className="flex items-center gap-1.5">
+                <span>Nota</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('nu_documento')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'nu_documento' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Nota"
+                >
+                  {sortColumn === 'nu_documento' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span>Fundo</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('nome_fundo')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'nome_fundo' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Fundo"
+                >
+                  {sortColumn === 'nome_fundo' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span>Sacado</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('nome_sacado')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'nome_sacado' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Sacado"
+                >
+                  {sortColumn === 'nome_sacado' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span>Vencimento</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('data_vencimento_original')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'data_vencimento_original' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Vencimento"
+                >
+                  {sortColumn === 'data_vencimento_original' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span>Valor Nominal</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('valor_nominal')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'valor_nominal' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Valor Nominal"
+                >
+                  {sortColumn === 'valor_nominal' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span>Status</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSort('status')}
+                  className={`rounded p-1 transition hover:bg-stone-200/70 ${
+                    sortColumn === 'status' ? 'text-[#0b2c20] bg-stone-200/80 font-extrabold' : 'text-stone-400'
+                  }`}
+                  title="Ordenar por Status (Aprovados primeiro / Recusadas primeiro)"
+                >
+                  {sortColumn === 'status' ? (
+                    sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  ) : (
+                    <ArrowUpDown size={12} />
+                  )}
+                </button>
+              </div>
+
               <span className="text-right">Detalhes</span>
             </div>
 
             {loading ? (
               <div className="py-12 text-center text-xs text-stone-500">Carregando notas...</div>
-            ) : filteredList.length === 0 ? (
+            ) : sortedAndFilteredList.length === 0 ? (
               <div className="py-12 text-center text-xs text-stone-500">Nenhum recebível encontrado com os filtros aplicados.</div>
             ) : (
-              filteredList.map((item) => {
+              sortedAndFilteredList.map((item) => {
                 const isOpen = !!expandedRows[item.id]
                 const isAprovado = item.status === 'APROVADO'
 
@@ -359,31 +641,96 @@ export function TabelaCedente() {
           </div>
         </div>
 
-        {/* Paginação de 20 em 20 */}
+        {/* Paginação Inteligente */}
         <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-stone-200 pt-4 sm:flex-row">
           <p className="text-xs text-stone-500">
             Total de {totalCount.toLocaleString('pt-BR')} registros · Página {page} de {totalPages} (20 por página)
           </p>
 
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Primeira Página */}
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage(1)}
+              title="Primeira Página"
+              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40 transition"
+            >
+              <ChevronsLeft size={14} />
+              <span className="hidden md:inline">Primeira</span>
+            </button>
+
+            {/* Página Anterior */}
             <button
               type="button"
               disabled={page <= 1 || loading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+              title="Página Anterior"
+              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40 transition"
             >
-              <ChevronLeft size={14} /> Anterior
+              <ChevronLeft size={14} />
+              <span className="hidden md:inline">Anterior</span>
             </button>
 
-            <span className="px-3 text-xs font-bold text-stone-800">{page}</span>
+            {/* Números das Páginas: Antecessora, Atual, Sucessora */}
+            <div className="flex items-center gap-1 px-1">
+              {/* Página Antecessora (link/botão clicável) */}
+              {page > 1 && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPage(page - 1)}
+                  title={`Ir para a página ${page - 1}`}
+                  className="min-w-[32px] rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition"
+                >
+                  {page - 1}
+                </button>
+              )}
 
+              {/* Página Atual (destaque ativo) */}
+              <span
+                aria-current="page"
+                className="min-w-[32px] rounded-md bg-[#0b2c20] px-2.5 py-1.5 text-center text-xs font-bold text-white shadow-sm"
+              >
+                {page}
+              </span>
+
+              {/* Página Sucessora (link/botão clicável) */}
+              {page < totalPages && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPage(page + 1)}
+                  title={`Ir para a página ${page + 1}`}
+                  className="min-w-[32px] rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition"
+                >
+                  {page + 1}
+                </button>
+              )}
+            </div>
+
+            {/* Próxima Página */}
             <button
               type="button"
               disabled={page >= totalPages || loading}
-              onClick={() => setPage((p) => p + 1)}
-              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              title="Próxima Página"
+              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40 transition"
             >
-              Próxima <ChevronRight size={14} />
+              <span className="hidden md:inline">Próxima</span>
+              <ChevronRight size={14} />
+            </button>
+
+            {/* Última Página */}
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage(totalPages)}
+              title="Última Página"
+              className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40 transition"
+            >
+              <span className="hidden md:inline">Última</span>
+              <ChevronsRight size={14} />
             </button>
           </div>
         </div>
