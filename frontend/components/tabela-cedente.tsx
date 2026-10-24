@@ -790,6 +790,40 @@ export function TabelaCedente({
           </div>
         </div>
       </section>
+
+      {/* Pop-up de canto de tela (Toast Vermelho) com auto-dismiss para registros ignorados por CNPJ diferente */}
+      {toastIgnorados && (
+        <aside
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-rose-500/30 bg-rose-950/95 p-4 text-white shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-rose-600/30 text-rose-300">
+              <AlertTriangle size={18} />
+            </div>
+            <div className="flex-1 pr-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-300">
+                Registros Ignorados no Upload
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-rose-100">
+                {toastIgnorados.mensagem}
+              </p>
+              <p className="mt-1.5 text-[10px] text-rose-300/70">
+                Esta notificação desaparecerá automaticamente em alguns segundos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastIgnorados(null)}
+              className="rounded-lg p-1 text-rose-300 hover:bg-rose-900/60 hover:text-white transition"
+              aria-label="Fechar aviso"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }

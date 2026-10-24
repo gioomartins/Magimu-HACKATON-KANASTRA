@@ -65,7 +65,7 @@ function formatCNPJ(doc: string): string {
 
 export default function AnalyticsGestorPage() {
   const router = useRouter()
-  const { user, loading: authLoading, logout } = useAuth()
+  const { user, isLoading: authLoading, logout } = useAuth()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -139,11 +139,11 @@ export default function AnalyticsGestorPage() {
         cnpj: formatCNPJ(s.doc_sacado),
       }))
       : [
-        { sacado: 'DISTRIBUIDORA ALFA', volume: 1540000, exposicao: 28.5 },
-        { sacado: 'LOGISTICA BETA', volume: 920000, exposicao: 17.1 },
-        { sacado: 'SUPERMERCADOS GAMA', volume: 640000, exposicao: 11.8 },
-        { sacado: 'DELTA COMERCIO', volume: 430000, exposicao: 8.0 },
-        { sacado: 'EPSILON IND E COM', volume: 290000, exposicao: 5.4 },
+        { sacado: 'DISTRIBUIDORA ALFA', volume: 1540000, exposicao: 28.5, cnpj: '—' },
+        { sacado: 'LOGISTICA BETA', volume: 920000, exposicao: 17.1, cnpj: '—' },
+        { sacado: 'SUPERMERCADOS GAMA', volume: 640000, exposicao: 11.8, cnpj: '—' },
+        { sacado: 'DELTA COMERCIO', volume: 430000, exposicao: 8.0, cnpj: '—' },
+        { sacado: 'EPSILON IND E COM', volume: 290000, exposicao: 5.4, cnpj: '—' },
       ]
 
   const kpis = data?.kpis || {

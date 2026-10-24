@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { FileUp, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { FileUp, Upload, CheckCircle2, AlertCircle, AlertTriangle, X } from 'lucide-react'
 import { uploadCSV } from '@/lib/api'
 
 interface UploadLoteCsvProps {
@@ -18,21 +18,42 @@ export function UploadLoteCsv({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const [toastIgnorados, setToastIgnorados] = useState<{ total: number; mensagem: string } | null>(null)
+
+  useEffect(() => {
+    if (toastIgnorados) {
+      const timer = setTimeout(() => {
+        setToastIgnorados(null)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [toastIgnorados])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
     setUploadMsg(null)
+    setToastIgnorados(null)
 
     try {
       const res = await uploadCSV(file)
       const aprovados = res.lote?.total_aprovados ?? 0
       const barrados = res.lote?.total_barrados ?? 0
+      const ignorados = res.total_ignorados ?? 0
+
       setUploadMsg({
         tipo: 'ok',
         texto: `Lote processado com sucesso! ${aprovados} notas aprovadas, ${barrados} recusadas/duplicadas. Usuários de fundos e cedentes sincronizados com senha 123456.`,
       })
+
+      if (ignorados > 0) {
+        setToastIgnorados({
+          total: ignorados,
+          mensagem: `${ignorados} recebíveis foram ignorados por pertencerem a outros CNPJs e não coincidirem com o CNPJ cadastrado.`,
+        })
+      }
+
       if (onUploadSuccess) {
         onUploadSuccess()
       }
@@ -96,6 +117,40 @@ export function UploadLoteCsv({
           )}
           <span>{uploadMsg.texto}</span>
         </div>
+      )}
+
+      {/* Pop-up de canto de tela (Toast Vermelho) com auto-dismiss para registros ignorados */}
+      {toastIgnorados && (
+        <aside
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-rose-500/30 bg-rose-950/95 p-4 text-white shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-rose-600/30 text-rose-300">
+              <AlertTriangle size={18} />
+            </div>
+            <div className="flex-1 pr-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-300">
+                Registros Ignorados no Upload
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-rose-100">
+                {toastIgnorados.mensagem}
+              </p>
+              <p className="mt-1.5 text-[10px] text-rose-300/70">
+                Esta notificação desaparecerá automaticamente em alguns segundos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastIgnorados(null)}
+              className="rounded-lg p-1 text-rose-300 hover:bg-rose-900/60 hover:text-white transition"
+              aria-label="Fechar aviso"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </aside>
       )}
     </section>
   )
