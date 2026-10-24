@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
 from django.conf import settings
-from core.models import LoteImportacao, Recebivel
+from core.models import LoteImportacao, PerfilUsuario, Recebivel
 from core.permissions import IsGestor
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.serializers import LoteImportacaoSerializer, RecebivelSerializer
@@ -34,6 +34,9 @@ class RecebivelViewSet(viewsets.ModelViewSet):
     """
     CRUD completo para Recebíveis com paginação de 20 em 20.
     Permite filtrar por status, lote, sacado ou número de documento.
+    Garante isolamento de dados:
+    - Se usuário EMPRESA (cedente), visualiza somente recebíveis correspondentes ao seu nome_cedente.
+    - Se usuário GESTOR (fundo), visualiza somente recebíveis relacionados ao seu fundo (se o nome corresponder a um fundo).
     """
     queryset = Recebivel.objects.all().order_by('-lote__criado_em', 'linha')
     serializer_class = RecebivelSerializer
@@ -41,6 +44,23 @@ class RecebivelViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
+
+        # Filtragem com base na identidade do usuário logado
+        if user and user.is_authenticated:
+            perfil = getattr(user, 'perfil', None)
+            username = user.username.strip()
+
+            if perfil and perfil.role == PerfilUsuario.Role.EMPRESA:
+                # Cedente vê estritamente suas operações
+                # Exceto usuários genéricos de demo como cedente_demo / empresa_demo caso não haja recebíveis com esse nome exato
+                if Recebivel.objects.filter(nome_cedente__iexact=username).exists():
+                    qs = qs.filter(nome_cedente__iexact=username)
+            elif perfil and perfil.role == PerfilUsuario.Role.GESTOR:
+                # Fundo vê os recebíveis do seu fundo
+                if Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+                    qs = qs.filter(nome_fundo__iexact=username)
+
         lote_id = self.request.query_params.get('lote')
         status_param = self.request.query_params.get('status')
         nu_doc = self.request.query_params.get('nu_documento')

@@ -23,10 +23,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
 
-from core.models import LoteImportacao, Recebivel, SituacaoCadastralCNPJ
+from core.models import LoteImportacao, PerfilUsuario, Recebivel, SituacaoCadastralCNPJ
 from core.profiler import profile_performance
 from core.rules_engine import ContextoValidacao, MotorDeRegras
 from core.utils import gerar_hash_recebivel, raiz_cnpj, somente_digitos
@@ -155,6 +156,10 @@ class ImportadorCSVService:
         # Hashes vistos dentro deste mesmo lote CSV
         hashes_no_lote: Set[str] = set()
 
+        # Coleta de nomes de fundos e cedentes para criação automática de contas de população
+        fundos_vistos: Set[str] = set()
+        cedentes_vistos: Set[str] = set()
+
         registros_log: List[Dict[str, Any]] = []
         novos_recebiveis: List[Recebivel] = []
         recebiveis_para_atualizar: List[Recebivel] = []
@@ -190,6 +195,13 @@ class ImportadorCSVService:
                 continue
 
             val_nom_total += valor
+            nome_fundo = row.get("NOME_FUNDO", "").strip()
+            nome_cedente = row.get("NOME_CEDENTE", "").strip()
+            if nome_fundo:
+                fundos_vistos.add(nome_fundo)
+            if nome_cedente:
+                cedentes_vistos.add(nome_cedente)
+
             doc_cedente = row["DOC_CEDENTE"].strip()
             doc_sacado = row["DOC_SACADO"].strip()
             doc_fundo = row["DOC_FUNDO"].strip()
@@ -344,9 +356,67 @@ class ImportadorCSVService:
         lote.finalizado_em = timezone.now()
         lote.save()
 
-        # 7. Gravação de log de registro em arquivo se solicitado
+        # 7. População amigável: Criação de conta para cada fundo e cedente diferente inserido via CSV
+        # Senha padrão: '123456'. Nome de usuário: nome do cedente / fundo.
+        self._criar_contas_populacao(fundos=fundos_vistos, cedentes=cedentes_vistos)
+
+        # 8. Gravação de log de registro em arquivo se solicitado
         if caminho_log:
             with open(caminho_log, "w", encoding="utf-8") as flog:
                 json.dump(registros_log, flog, ensure_ascii=False, indent=2)
 
         return lote, registros_log
+
+    def _criar_contas_populacao(self, fundos: Set[str], cedentes: Set[str]) -> None:
+        """
+        Garante contas para cada fundo e cedente do lote importado:
+        - Se o fundo ou cedente JÁ POSSUI cadastro, NENHUMA nova conta é criada e suas
+          credenciais (senha e perfil existentes) são rigorosamente preservadas.
+          Os recebíveis presentes no CSV aparecerão automaticamente em seu cadastro pré-existente.
+        - Se o fundo ou cedente for NOVO, cria a conta com usuário=nome e senha padrão '123456'.
+        """
+        senha_padrao = "123456"
+
+        for nome_fundo in fundos:
+            username = nome_fundo.strip()
+            if not username:
+                continue
+
+            # Se o usuário já existe (por nome ou case-insensitive), não cria nova conta e preserva
+            usuario_existente = User.objects.filter(username__iexact=username).first()
+            if usuario_existente:
+                # Cadastro pré-existente: preserva credenciais e garante vínculo do perfil
+                if not hasattr(usuario_existente, 'perfil'):
+                    PerfilUsuario.objects.create(usuario=usuario_existente, role=PerfilUsuario.Role.GESTOR)
+                continue
+
+            # Usuário novo: cria com a senha padrão 123456 e role GESTOR
+            user = User.objects.create_user(
+                username=username,
+                password=senha_padrao,
+                first_name=username[:30],
+            )
+            PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.GESTOR)
+
+        for nome_cedente in cedentes:
+            username = nome_cedente.strip()
+            if not username:
+                continue
+
+            # Se o usuário já existe (por nome ou case-insensitive), não cria nova conta e preserva
+            usuario_existente = User.objects.filter(username__iexact=username).first()
+            if usuario_existente:
+                # Cadastro pré-existente: preserva credenciais e garante perfil
+                if not hasattr(usuario_existente, 'perfil'):
+                    PerfilUsuario.objects.create(usuario=usuario_existente, role=PerfilUsuario.Role.EMPRESA)
+                continue
+
+            # Usuário novo: cria com a senha padrão 123456 e role EMPRESA
+            user = User.objects.create_user(
+                username=username,
+                password=senha_padrao,
+                first_name=username[:30],
+            )
+            PerfilUsuario.objects.create(usuario=user, role=PerfilUsuario.Role.EMPRESA)
+
+

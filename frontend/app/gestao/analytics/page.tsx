@@ -32,6 +32,7 @@ import {
 import { useAuth } from '@/lib/auth-context'
 import { fetchAnalyticsDashboard, AnalyticsData } from '@/lib/api'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { UploadLoteCsv } from '@/components/upload-lote-csv'
 
 // Paleta de cores alinhada à Kanastra e semântica de risco
 const COLORS_PIE = [
@@ -223,6 +224,15 @@ export default function AnalyticsGestorPage() {
             {errorMsg}
           </div>
         )}
+
+        {/* Entrada CSV para população do sistema na dashboard do gestor */}
+        <div className="mb-8">
+          <UploadLoteCsv
+            onUploadSuccess={carregarDados}
+            titulo="População do Sistema & Ingestão de Recebíveis (CSV)"
+            descricao="Submeta arquivos CSV para popular recebíveis, fundos e cedentes no sistema. As estatísticas e gráficos refletirão imediatamente a carteira do fundo."
+          />
+        </div>
 
         {/* 1. LINHA SUPERIOR COM OS 3 HIGH-LEVEL KPIS (Cards Off-White) */}
         <section className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-3">

@@ -17,7 +17,8 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { fetchRecebiveis, RecebivelItem, uploadCSV } from '@/lib/api'
+import { fetchRecebiveis, RecebivelItem } from '@/lib/api'
+import { UploadLoteCsv } from './upload-lote-csv'
 
 function MetricCard({
   label,
@@ -140,40 +141,15 @@ export function TabelaCedente() {
 
   return (
     <div className="space-y-6">
-      {/* Upload de CSV com verificação de duplicidade */}
-      <section className="rounded-2xl border border-emerald-200/15 bg-[#103b2c] p-5 sm:p-6 text-stone-100 shadow-md">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
-              <FileUp size={22} />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-[#f8f6f1]">Submeter Notas / Recebíveis</h2>
-              <p className="mt-0.5 text-xs text-emerald-100/60">
-                Formato CSV com separador ponto e vírgula (;) · Duplicatas serão barradas ou atualizadas conforme regras.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => inputRef.current?.click()}
-              className="flex items-center gap-2 rounded-lg bg-[#f8f6f1] px-4 py-2.5 text-xs font-bold text-[#0b2c20] transition hover:bg-white disabled:opacity-50"
-            >
-              <Upload size={15} /> {uploading ? 'Processando lote...' : 'Upload de Lote (CSV)'}
-            </button>
-            <input ref={inputRef} type="file" accept=".csv" onChange={handleFileUpload} className="sr-only" />
-          </div>
-        </div>
-
-        {uploadMsg && (
-          <div className="mt-3 rounded-lg border border-emerald-300/20 bg-emerald-950/60 p-3 text-xs text-emerald-200">
-            {uploadMsg}
-          </div>
-        )}
-      </section>
+      {/* Upload de CSV com verificação de duplicidade e população amigável */}
+      <UploadLoteCsv
+        onUploadSuccess={() => {
+          setPage(1)
+          carregarDados()
+        }}
+        titulo="Submeter Notas / Recebíveis"
+        descricao="Formato CSV com separador ponto e vírgula (;) · Popula cedentes e fundos com contas de acesso automático e sincroniza a carteira."
+      />
 
       {/* Cards de Métricas */}
       <div className="grid gap-3 md:grid-cols-3">

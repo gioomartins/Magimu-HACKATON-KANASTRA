@@ -19,15 +19,21 @@ class AnalyticsDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsGestor]
 
     def get(self, request, *args, **kwargs):
+        # Escopo do fundo se o usuário autenticado for um fundo específico
+        base_qs = Recebivel.objects.all()
+        username = request.user.username.strip() if request.user and request.user.is_authenticated else ""
+        if username and Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+            base_qs = base_qs.filter(nome_fundo__iexact=username)
+
         # 1. Totalizadores de Operações
-        total_notas = Recebivel.objects.count()
+        total_notas = base_qs.count()
 
         # Agregações por status
-        agregados_aprovado = Recebivel.objects.filter(status=Recebivel.Status.APROVADO).aggregate(
+        agregados_aprovado = base_qs.filter(status=Recebivel.Status.APROVADO).aggregate(
             volume=Sum('valor_nominal'),
             qtd=Count('id')
         )
-        agregados_barrado = Recebivel.objects.filter(status=Recebivel.Status.BARRADO).aggregate(
+        agregados_barrado = base_qs.filter(status=Recebivel.Status.BARRADO).aggregate(
             volume=Sum('valor_nominal'),
             qtd=Count('id')
         )
@@ -50,14 +56,25 @@ class AnalyticsDashboardView(APIView):
         if qtd_recusadas > 0:
             try:
                 with connection.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
-                        FROM antecipe_recebivel
-                        WHERE status = 'BARRADO'
-                        GROUP BY motivo
-                        ORDER BY total DESC
-                        LIMIT 8
-                    """)
+                    # Se houver filtro de fundo, aplica na query raw
+                    if username and Recebivel.objects.filter(nome_fundo__iexact=username).exists():
+                        cursor.execute("""
+                            SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
+                            FROM antecipe_recebivel
+                            WHERE status = 'BARRADO' AND LOWER(nome_fundo) = LOWER(%s)
+                            GROUP BY motivo
+                            ORDER BY total DESC
+                            LIMIT 8
+                        """, [username])
+                    else:
+                        cursor.execute("""
+                            SELECT unnest(barrado_por) AS motivo, COUNT(*) AS total
+                            FROM antecipe_recebivel
+                            WHERE status = 'BARRADO'
+                            GROUP BY motivo
+                            ORDER BY total DESC
+                            LIMIT 8
+                        """)
                     motivos_recusa = [
                         {"motivo": row[0], "total": int(row[1])}
                         for row in cursor.fetchall()
@@ -65,7 +82,7 @@ class AnalyticsDashboardView(APIView):
             except Exception:
                 # Fallback em Python caso o banco de testes não suporte unnest do postgres
                 contagem_motivos = {}
-                for rec in Recebivel.objects.filter(status=Recebivel.Status.BARRADO).only('barrado_por'):
+                for rec in base_qs.filter(status=Recebivel.Status.BARRADO).only('barrado_por'):
                     for mot in rec.barrado_por:
                         contagem_motivos[mot] = contagem_motivos.get(mot, 0) + 1
                 motivos_recusa = [
@@ -75,7 +92,7 @@ class AnalyticsDashboardView(APIView):
 
         # 4. Risco de Concentração (Top 5 Sacados por Volume Aprovado)
         sacados_query = (
-            Recebivel.objects.filter(status=Recebivel.Status.APROVADO)
+            base_qs.filter(status=Recebivel.Status.APROVADO)
             .values('doc_sacado', 'nome_sacado')
             .annotate(
                 volume=Sum('valor_nominal'),

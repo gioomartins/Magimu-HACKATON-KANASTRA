@@ -154,6 +154,9 @@ export default function LoginPage() {
               <span className="text-[10px] text-stone-500">gestor_demo</span>
             </button>
           </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-emerald-800/80">
+            💡 Contas geradas por arquivos CSV de população usam o <strong>nome exato do Cedente ou Fundo</strong> como usuário e senha <strong>123456</strong>.
+          </p>
         </div>
 
         <div className="mt-6 border-t border-stone-200 pt-5 text-center text-xs text-stone-600">

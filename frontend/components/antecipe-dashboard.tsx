@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, BarChart3, Building2, LogOut, RefreshCw, User, Wallet } from 'lucide-react'
 import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
+import { UploadLoteCsv } from './upload-lote-csv'
 import { ThemeToggle } from './theme-toggle'
 import { useAuth } from '@/lib/auth-context'
 
@@ -137,7 +138,15 @@ export function AntecipeDashboard() {
         </header>
 
         {/* Conteúdo Dinâmico Baseado Estritamente no Perfil de Acesso */}
-        <div className="mt-4">
+        <div className="mt-4 space-y-6">
+          {/* Entrada CSV para população do sistema na dashboard (abaixo do header, acima das informações principais) */}
+          {isGestor && (
+            <UploadLoteCsv
+              titulo="População do Sistema & Ingestão de Fundo (CSV)"
+              descricao="Importe lotes com centenas de milhares de notas. Cada cedente e fundo novo terá sua conta criada automaticamente (senha padrão 123456)."
+            />
+          )}
+
           {isGestor ? <DashboardFundo /> : <TabelaCedente />}
         </div>
 

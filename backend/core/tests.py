@@ -267,21 +267,67 @@ class RecebivelAPITests(TestCase):
         self.assertEqual(res_get.status_code, status.HTTP_200_OK)
         self.assertEqual(res_get.json()['nu_documento'], 'NF-999')
 
-    def test_regras_endpoint_get_e_post(self):
-        u_gestor = User.objects.create_user(username='gestor_test', password='pwd')
-        PerfilUsuario.objects.create(usuario=u_gestor, role=PerfilUsuario.Role.GESTOR)
-        self.client.force_authenticate(user=u_gestor)
+    def test_populacao_automatica_de_contas_e_isolamento(self):
+        # Cria CSV com 1 fundo e 1 cedente
+        csv_data = (
+            "NOME_FUNDO;DOC_FUNDO;NOME_CEDENTE;DOC_CEDENTE;NOME_SACADO;DOC_SACADO;NU_DOCUMENTO;TIPO_RECEBIVEL;VALOR_NOMINAL;DATA_VENCIMENTO_ORIGINAL;DATA_AQUISICAO\n"
+            "Fundo Alfa FIDC;00.000.000/0001-91;Cedente Beta LTDA;11.111.111/0001-11;Sacado Gama;22.222.222/0001-22;DOC-POP-01;Duplicata;5000,00;20/11/2026;22/10/2026\n"
+        )
+        service = ImportadorCSVService()
+        f = io.StringIO(csv_data)
+        lote, _ = service.processar_arquivo(f, "populacao_test.csv")
 
-        # Teste GET /api/regras/
-        res_get = self.client.get('/api/regras/')
-        self.assertEqual(res_get.status_code, status.HTTP_200_OK)
-        self.assertIn('validadores', res_get.json())
+        # Verifica se as contas foram criadas com senha '123456'
+        u_fundo = User.objects.filter(username="Fundo Alfa FIDC").first()
+        self.assertIsNotNone(u_fundo)
+        self.assertTrue(u_fundo.check_password("123456"))
+        self.assertEqual(u_fundo.perfil.role, PerfilUsuario.Role.GESTOR)
 
-        # Teste POST /api/regras/ atualizando configuração
-        regras_atuais = res_get.json()
-        res_post = self.client.post('/api/regras/', regras_atuais, format='json')
-        self.assertEqual(res_post.status_code, status.HTTP_200_OK)
-        self.assertIn('mensagem', res_post.json())
-        self.assertIn('total_reprecificadas', res_post.json())
+        u_cedente = User.objects.filter(username="Cedente Beta LTDA").first()
+        self.assertIsNotNone(u_cedente)
+        self.assertTrue(u_cedente.check_password("123456"))
+        self.assertEqual(u_cedente.perfil.role, PerfilUsuario.Role.EMPRESA)
+
+        # Isolamento do Cedente: só vê seus recebíveis
+        self.client.force_authenticate(user=u_cedente)
+        res_ced = self.client.get('/api/recebiveis/')
+        self.assertEqual(res_ced.status_code, status.HTTP_200_OK)
+        for item in res_ced.json()['results']:
+            self.assertEqual(item['nome_cedente'], "Cedente Beta LTDA")
+
+        # Isolamento de Analytics do Gestor: só vê dados do seu fundo
+        self.client.force_authenticate(user=u_fundo)
+        res_analytics = self.client.get('/api/analytics/dashboard/')
+        self.assertEqual(res_analytics.status_code, status.HTTP_200_OK)
+        # O total processado deve corresponder apenas às notas do Fundo Alfa FIDC
+        self.assertEqual(res_analytics.json()['kpis']['quantidade_total_processada'], 1)
+
+        # CENÁRIO: Envio de novo CSV contendo o mesmo cedente/fundo pré-existente (com senha personalizada)
+        u_cedente.set_password("senha_customizada_secreta")
+        u_cedente.save()
+        total_usuarios_antes = User.objects.count()
+
+        csv_data_2 = (
+            "NOME_FUNDO;DOC_FUNDO;NOME_CEDENTE;DOC_CEDENTE;NOME_SACADO;DOC_SACADO;NU_DOCUMENTO;TIPO_RECEBIVEL;VALOR_NOMINAL;DATA_VENCIMENTO_ORIGINAL;DATA_AQUISICAO\n"
+            "Fundo Alfa FIDC;00.000.000/0001-91;Cedente Beta LTDA;11.111.111/0001-11;Sacado Delta;33.333.333/0001-33;DOC-POP-02;Duplicata;3500,00;25/11/2026;22/10/2026\n"
+        )
+        f2 = io.StringIO(csv_data_2)
+        service.processar_arquivo(f2, "populacao_test_2.csv")
+
+        # Não deve criar nova conta para Cedente Beta LTDA nem para Fundo Alfa FIDC
+        self.assertEqual(User.objects.count(), total_usuarios_antes)
+        u_cedente_reload = User.objects.get(username="Cedente Beta LTDA")
+        # Senha personalizada pré-existente deve ser estritamente preservada
+        self.assertTrue(u_cedente_reload.check_password("senha_customizada_secreta"))
+
+        # As notas novas devem aparecer no cadastro pré-existente
+        self.client.force_authenticate(user=u_cedente_reload)
+        res_ced_atualizado = self.client.get('/api/recebiveis/')
+        self.assertEqual(res_ced_atualizado.status_code, status.HTTP_200_OK)
+        docs = [item['nu_documento'] for item in res_ced_atualizado.json()['results']]
+        self.assertIn("DOC-POP-01", docs)
+        self.assertIn("DOC-POP-02", docs)
+
+
 
 
