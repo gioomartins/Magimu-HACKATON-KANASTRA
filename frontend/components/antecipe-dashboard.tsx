@@ -8,11 +8,14 @@ import { TabelaCedente } from './tabela-cedente'
 import { DashboardFundo } from './dashboard-fundo'
 import { UploadLoteCsv } from './upload-lote-csv'
 import { ThemeToggle } from './theme-toggle'
+import { LanguageSwitcher } from './language-switcher'
 import { useAuth } from '@/lib/auth-context'
+import { useTranslation } from 'react-i18next'
 import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
 
 export function AntecipeDashboard() {
   const router = useRouter()
+  const { t } = useTranslation()
   const { user, isDemo, isLoading, loginDemo, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -34,7 +37,7 @@ export function AntecipeDashboard() {
       <main className="flex min-h-screen items-center justify-center bg-[#f8f6f1] text-[#0b2c20] dark:bg-[#0b2c20] dark:text-[#f8f6f1]">
         <div className="flex items-center gap-3 text-sm">
           <RefreshCw className="animate-spin text-emerald-500" size={18} />
-          <span>{isLoggingOut ? 'Saindo da conta...' : 'Verificando autenticação...'}</span>
+          <span>{isLoggingOut ? t('common.loggingOut') : t('common.checkingAuth')}</span>
         </div>
       </main>
     )
@@ -53,10 +56,10 @@ export function AntecipeDashboard() {
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-1.5">
               <Sparkles size={14} className="text-emerald-200" />
-              <span>Modo Demonstração (Em Memória · Sem Cookies)</span>
+              <span>{t('nav.demoBanner')}</span>
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-emerald-200">Alternar pré-visualização:</span>
+              <span className="text-[11px] text-emerald-200">{t('nav.togglePreview')}</span>
               <button
                 type="button"
                 onClick={() => loginDemo(DEMO_CEDENTE_USER)}
@@ -64,7 +67,7 @@ export function AntecipeDashboard() {
                   !isGestor ? 'bg-white text-emerald-900 shadow-xs' : 'bg-emerald-800/80 text-emerald-200 hover:bg-emerald-800'
                 }`}
               >
-                Cedente
+                {t('common.appName') === 'Antecipe' && isGestor ? 'Cedente' : 'Cedente'}
               </button>
               <button
                 type="button"
@@ -85,7 +88,7 @@ export function AntecipeDashboard() {
         <header className="mb-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
             <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-800 dark:text-emerald-300/80">
-              <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400" /> Plataforma Antecipe · Kanastra
+              <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400" /> {t('nav.platformKanastra')}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight text-[#0b2c20] dark:text-[#f8f6f1] sm:text-4xl">
@@ -94,16 +97,14 @@ export function AntecipeDashboard() {
               <Link
                 href="/"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800/20 bg-emerald-900/10 px-3 py-1 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-900/20 dark:border-emerald-300/20 dark:bg-[#103b2c] dark:text-emerald-200 dark:hover:bg-[#164c39]"
-                title="Voltar para a página inicial"
+                title={t('common.backToHome')}
               >
                 <ArrowLeft size={13} />
-                <span>Página Inicial</span>
+                <span>{t('common.home')}</span>
               </Link>
             </div>
             <p className="mt-1 text-xs text-stone-600 dark:text-emerald-100/65">
-              {isGestor
-                ? 'Governança de Fundo: Parametrização em tempo real e regras de crédito FIDC.'
-                : 'Gestão de Recebíveis: Antecipação de faturas com transparência de recusas e simulação.'}
+              {isGestor ? t('dashboard.fundoSubtitle') : t('dashboard.cedenteSubtitle')}
             </p>
           </div>
 
@@ -113,7 +114,7 @@ export function AntecipeDashboard() {
               <div className="flex items-center gap-2">
                 <div className="inline-flex items-center gap-2 rounded-xl border border-amber-600/30 bg-amber-500/15 px-3.5 py-2 text-xs font-bold text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
                   <Building2 size={15} className="text-amber-600 dark:text-amber-400" />
-                  <span>Área dos Fundos</span>
+                  <span>{t('nav.fundsArea')}</span>
                 </div>
 
                 {/* Aba / Atalho para Analytics & Risco */}
@@ -123,13 +124,13 @@ export function AntecipeDashboard() {
                   title="Acessar painel de Analytics & Risco"
                 >
                   <BarChart3 size={15} className="text-emerald-400" />
-                  <span>Analytics & Risco</span>
+                  <span>{t('common.analytics')}</span>
                 </Link>
               </div>
             ) : (
               <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-800/20 bg-emerald-900/10 px-3.5 py-2 text-xs font-bold text-emerald-900 dark:border-emerald-300/20 dark:bg-[#103b2c] dark:text-emerald-200">
                 <Wallet size={15} className="text-emerald-600 dark:text-emerald-400" />
-                <span>Área dos Cedentes</span>
+                <span>{t('nav.cedentsArea')}</span>
               </div>
             )}
 
@@ -150,10 +151,10 @@ export function AntecipeDashboard() {
                   type="button"
                   onClick={handleLogout}
                   className="ml-1 inline-flex items-center gap-1 text-[11px] font-semibold text-stone-500 hover:text-rose-600 dark:text-emerald-200/60 dark:hover:text-rose-300 transition"
-                  title="Sair da conta"
+                  title={t('common.logout')}
                 >
                   <LogOut size={12} />
-                  <span>Sair</span>
+                  <span>{t('common.logout')}</span>
                 </button>
               </div>
             ) : (
@@ -162,9 +163,12 @@ export function AntecipeDashboard() {
                 className="inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-emerald-800/20 bg-white px-4 text-xs font-bold text-stone-800 shadow-sm hover:bg-stone-50 dark:border-emerald-300/20 dark:bg-[#103b2c] dark:text-emerald-100 dark:hover:bg-[#154635] transition"
               >
                 <User size={14} />
-                <span>Entrar</span>
+                <span>{t('common.login')}</span>
               </Link>
             )}
+
+            {/* Alternador de Idioma (PT / EN) */}
+            <LanguageSwitcher />
 
             {/* Alternador de Tema Claro / Escuro */}
             <ThemeToggle />

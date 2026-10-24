@@ -7,11 +7,13 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Lock, User, AlertCircle, ShieldCheck } from 'lucide-react'
 import { loginApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { DEMO_CEDENTE_USER, DEMO_FUNDO_USER } from '@/lib/demo-data'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useTranslation } from 'react-i18next'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, loginDemo } = useAuth()
+  const { login } = useAuth()
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,15 +37,16 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#0B2C20] px-4 py-12 text-[#f8f6f1]">
-      {/* Botão de Retorno */}
-      <div className="w-full max-w-md mb-6">
+      {/* Botão de Retorno e Language Switcher */}
+      <div className="w-full max-w-md mb-6 flex items-center justify-between">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300 hover:text-white transition"
         >
           <ArrowLeft size={14} />
-          <span>Voltar para a página inicial</span>
+          <span>{t('common.backToHome')}</span>
         </Link>
+        <LanguageSwitcher />
       </div>
 
       {/* Card de Login Off-White */}
@@ -59,10 +62,10 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-[#0B2C20]">
-            Entrar na Plataforma
+            {t('login.title')}
           </h1>
           <p className="mt-1 text-xs text-stone-600">
-            Acesse o sistema de antecipação com seu perfil de Gestor ou Empresa
+            {t('login.subtitle')}
           </p>
         </div>
 
@@ -79,7 +82,7 @@ export default function LoginPage() {
               htmlFor="username"
               className="block text-[11px] font-bold uppercase tracking-wider text-stone-600"
             >
-              Usuário
+              {t('login.usernameLabel')}
             </label>
             <div className="relative mt-1.5">
               <User size={15} className="absolute left-3.5 top-3.5 text-stone-400" />
@@ -89,7 +92,7 @@ export default function LoginPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Seu nome de usuário"
+                placeholder={t('login.usernamePlaceholder')}
                 className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-stone-800 placeholder-stone-400 shadow-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
@@ -100,7 +103,7 @@ export default function LoginPage() {
               htmlFor="password"
               className="block text-[11px] font-bold uppercase tracking-wider text-stone-600"
             >
-              Senha
+              {t('login.passwordLabel')}
             </label>
             <div className="relative mt-1.5">
               <Lock size={15} className="absolute left-3.5 top-3.5 text-stone-400" />
@@ -110,7 +113,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder={t('login.passwordPlaceholder')}
                 className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-stone-800 placeholder-stone-400 shadow-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
@@ -121,55 +124,18 @@ export default function LoginPage() {
             disabled={loading}
             className="mt-2 flex h-12 min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#0B2C20] text-xs font-bold uppercase tracking-wider text-[#F8F6F1] shadow-md transition hover:bg-[#103B2C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50"
           >
-            <span>{loading ? 'Entrando...' : 'Acessar Conta'}</span>
+            <span>{loading ? t('login.submitting') : t('login.submitButton')}</span>
             <ArrowRight size={15} />
           </button>
         </form>
 
-        {/* Acesso Rápido para Avaliação / Modo Demonstração */}
-        <div className="mt-6 rounded-xl border border-emerald-900/10 bg-emerald-50/70 p-3.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
-            Modo Demonstração Instantâneo (1-Clique)
-          </p>
-          <p className="mt-1 text-[11px] text-stone-600">
-            Visualize as páginas e funcionalidades com dados de teste em memória, sem salvar cookies:
-          </p>
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                loginDemo(DEMO_CEDENTE_USER)
-                router.push('/plataforma')
-              }}
-              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
-            >
-              <span className="block font-bold">Ver como Cedente</span>
-              <span className="text-[10px] text-stone-500">Empresa Demo</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                loginDemo(DEMO_FUNDO_USER)
-                router.push('/plataforma')
-              }}
-              className="rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-left text-[11px] font-medium text-emerald-900 shadow-xs hover:bg-emerald-100/60 transition"
-            >
-              <span className="block font-bold">Ver como Fundo</span>
-              <span className="text-[10px] text-stone-500">Gestor FIDC Demo</span>
-            </button>
-          </div>
-          <p className="mt-2.5 text-[10px] leading-relaxed text-emerald-800/80">
-            💡 Contas criadas ao popular o sistema por CSV utilizam o <strong>nome exato da instituição</strong> e senha <strong>123456</strong>. Para a conta mestra, utilize <strong>admin</strong>.
-          </p>
-        </div>
-
         <div className="mt-6 border-t border-stone-200 pt-5 text-center text-xs text-stone-600">
-          Ainda não tem conta?{' '}
+          {t('login.noAccount')}{' '}
           <Link
             href="/register"
             className="font-bold text-[#0B2C20] hover:text-emerald-700 transition"
           >
-            Cadastre-se aqui
+            {t('login.registerLink')}
           </Link>
         </div>
       </div>

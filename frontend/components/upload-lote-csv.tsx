@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { FileUp, Upload, CheckCircle2, AlertCircle, AlertTriangle, X } from 'lucide-react'
 import { uploadCSV } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
 
 interface UploadLoteCsvProps {
   onUploadSuccess?: () => void
@@ -15,6 +16,8 @@ export function UploadLoteCsv({
   titulo = 'População do Sistema & Submissão em Lote (CSV)',
   descricao = 'Submeta o arquivo CSV para alimentar o sistema. Cedentes e Fundos únicos receberão contas automáticas de acesso (senha: 123456).'
 }: UploadLoteCsvProps) {
+  const { user, isDemo } = useAuth()
+  const isDemoActive = isDemo || user?.username?.startsWith('demo_')
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
@@ -86,16 +89,31 @@ export function UploadLoteCsv({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            disabled={uploading}
+            disabled={uploading || isDemoActive}
             onClick={() => inputRef.current?.click()}
-            className="flex items-center gap-2 rounded-lg bg-[#f8f6f1] px-4 py-2.5 text-xs font-bold text-[#0b2c20] transition hover:bg-white disabled:opacity-50 shadow-sm"
+            title={
+              isDemoActive
+                ? 'Upload desabilitado em modo demonstração (página de pura visualização).'
+                : 'Upload de Lote (CSV)'
+            }
+            className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition shadow-sm ${
+              isDemoActive
+                ? 'bg-stone-300 text-stone-500 cursor-not-allowed opacity-60'
+                : 'bg-[#f8f6f1] text-[#0b2c20] hover:bg-white disabled:opacity-50'
+            }`}
           >
-            <Upload size={15} /> {uploading ? 'Processando lote...' : 'Upload de Lote (CSV)'}
+            <Upload size={15} />{' '}
+            {isDemoActive
+              ? 'Upload (Demo Bloqueado)'
+              : uploading
+              ? 'Processando lote...'
+              : 'Upload de Lote (CSV)'}
           </button>
           <input
             ref={inputRef}
             type="file"
             accept=".csv"
+            disabled={isDemoActive}
             onChange={handleFileUpload}
             className="sr-only"
           />

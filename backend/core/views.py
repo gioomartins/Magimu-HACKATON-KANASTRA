@@ -59,6 +59,8 @@ class RecebivelViewSet(viewsets.ModelViewSet):
                     qs = qs.filter(models.Q(nome_cedente__iexact=cedente_obj.nome) | models.Q(doc_cedente=cedente_obj.codigo))
                 elif Recebivel.objects.filter(nome_cedente__iexact=username).exists():
                     qs = qs.filter(nome_cedente__iexact=username)
+                else:
+                    qs = qs.none()
             elif perfil and perfil.role == PerfilUsuario.Role.GESTOR:
                 # Fundo vê os recebíveis do seu fundo
                 fundo_obj = Fundo.objects.filter(usuario=user).first()
@@ -66,6 +68,8 @@ class RecebivelViewSet(viewsets.ModelViewSet):
                     qs = qs.filter(models.Q(nome_fundo__iexact=fundo_obj.nome) | models.Q(doc_fundo=fundo_obj.codigo))
                 elif Recebivel.objects.filter(nome_fundo__iexact=username).exists():
                     qs = qs.filter(nome_fundo__iexact=username)
+                else:
+                    qs = qs.none()
 
         lote_id = self.request.query_params.get('lote')
         status_param = self.request.query_params.get('status')
