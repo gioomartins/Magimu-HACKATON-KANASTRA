@@ -32,7 +32,6 @@ import {
 import { useAuth } from '@/lib/auth-context'
 import { fetchAnalyticsDashboard, AnalyticsData } from '@/lib/api'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { UploadLoteCsv } from '@/components/upload-lote-csv'
 
 // Paleta de cores alinhada à Kanastra e semântica de risco
@@ -205,7 +204,6 @@ export default function AnalyticsGestorPage() {
               </button>
             </div>
 
-            <LanguageSwitcher />
             <ThemeToggle />
           </div>
         </header>

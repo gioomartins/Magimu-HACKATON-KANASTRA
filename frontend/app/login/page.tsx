@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Lock, User, AlertCircle, ShieldCheck } from 'lucide-react'
 import { loginApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from 'react-i18next'
 
 export default function LoginPage() {
@@ -37,8 +36,8 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#0B2C20] px-4 py-12 text-[#f8f6f1]">
-      {/* Botão de Retorno e Language Switcher */}
-      <div className="w-full max-w-md mb-6 flex items-center justify-between">
+      {/* Botão de Retorno */}
+      <div className="w-full max-w-md mb-6">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300 hover:text-white transition"
@@ -46,7 +45,6 @@ export default function LoginPage() {
           <ArrowLeft size={14} />
           <span>{t('common.backToHome')}</span>
         </Link>
-        <LanguageSwitcher />
       </div>
 
       {/* Card de Login Off-White */}
